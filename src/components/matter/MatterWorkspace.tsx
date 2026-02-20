@@ -258,9 +258,14 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
 
         try {
             const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+            const { useAuthStore } = await import('@/stores/authStore');
+            const token = useAuthStore.getState().token;
             const response = await fetch(`${apiBase}/matters/${DEMO_MATTER_ID}/stream`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify({ message: content }),
             });
 
