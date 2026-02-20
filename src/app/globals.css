@@ -1,0 +1,508 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================
+   CERTIS DESIGN SYSTEM — v2
+   Dark sidebar + Light content areas
+   ============================================ */
+
+@theme {
+  /* ---- Sidebar (Warm Charcoal / Iron) ---- */
+  --color-sidebar-bg: #222220;
+  --color-sidebar-surface: #2E2E2C;
+  --color-sidebar-hover: #383836;
+  --color-sidebar-active: #454542;
+  --color-sidebar-border: #3A3A38;
+  --color-sidebar-text: #E6E6E3;
+  --color-sidebar-text-secondary: #9C9C99;
+  --color-sidebar-text-muted: #6B6B69;
+
+  /* ---- Content (Rice Paper / Warm Neutral) ---- */
+  --color-content-bg: #F9F9F7;
+  --color-content-surface: #FFFFFF;
+  --color-content-raised: #F2F2F0;
+  --color-content-hover: #F0F0EE;
+  --color-content-text: #333331;
+  /* Warm Black */
+  --color-content-text-secondary: #5C5C59;
+  --color-content-text-muted: #8D8D8A;
+  --color-content-border: #EEEEEC;
+  --color-content-border-strong: #E0E0DE;
+
+  /* ---- Accent (Sage Green) ---- */
+  --color-accent-50: #F4F7F4;
+  --color-accent-100: #E3EBE3;
+  --color-accent-200: #C5D6C5;
+  --color-accent-300: #A3BCA3;
+  --color-accent-400: #7E9E7E;
+  --color-accent-500: #5D7052;
+  /* Primary Sage */
+  --color-accent-600: #4A5A42;
+  --color-accent-700: #394533;
+  --color-accent-800: #293024;
+  --color-accent-900: #1A1F17;
+
+  /* ---- Secondary / Link Accent (Muted Warm Blue/Grey) ---- */
+  --color-blue-400: #8C9CAB;
+  --color-blue-500: #6B7C8C;
+  --color-blue-600: #4A5A6A;
+
+  /* ---- Status Colors (Muted/Organic) ---- */
+  --color-success: #5D7052;
+  /* Sage matches success */
+  --color-success-light: #F0F4F0;
+  --color-success-muted: #394533;
+  --color-warning: #C49A6C;
+  /* Warm Wheat/Gold */
+  --color-warning-light: #FAF6F0;
+  --color-warning-muted: #705435;
+  --color-danger: #B85C5C;
+  /* Potter's Clay Red */
+  --color-danger-light: #F9F0F0;
+  --color-danger-muted: #6B3333;
+  --color-info: #6B7C8C;
+  /* Slate Blue */
+  --color-info-light: #F2F4F7;
+
+  /* ---- Spacing ---- */
+  --spacing-sidebar: 240px;
+  --spacing-artifact: 340px;
+
+  /* ---- Radius (Slightly softer but not rounded) ---- */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* ---- Shadows (Diffuse / Zen) ---- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-elevated: 0 12px 32px rgba(0, 0, 0, 0.04), 0 4px 8px rgba(0, 0, 0, 0.02);
+  --shadow-bubble: 0 1px 3px rgba(0, 0, 0, 0.04);
+
+  /* ---- Font ---- */
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+/* ---- Base ---- */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+body {
+  background-color: var(--color-content-bg);
+  color: var(--color-content-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-content-border);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-content-border-strong);
+}
+
+/* ---- Badge (Subtle, Muted) ---- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  /* Prepare for outline style */
+}
+
+/* Warm, muted badge variants */
+.badge-success {
+  color: #2F3E2F;
+  background: var(--color-success-light);
+  border-color: #D6E6D6;
+}
+
+.badge-warning {
+  color: #5C462B;
+  background: var(--color-warning-light);
+  border-color: #E8DECF;
+}
+
+.badge-danger {
+  color: #6B3333;
+  background: var(--color-danger-light);
+  border-color: #F0DADA;
+}
+
+.badge-info {
+  color: var(--color-blue-600);
+  background: #F0F4F8;
+  border-color: #DEE4EA;
+}
+
+.badge-accent {
+  color: var(--color-accent-600);
+  background: var(--color-accent-50);
+  border-color: var(--color-accent-100);
+}
+
+/* ---- Chat Bubbles (Zen) ---- */
+.chat-bubble-user {
+  background: var(--color-accent-500);
+  /* Sage Green solid */
+  color: white;
+  border-radius: var(--radius-lg);
+  padding: 12px 18px;
+  max-width: 100%;
+  box-shadow: var(--shadow-sm);
+  font-weight: 400;
+  /* Lighter weight for elegance */
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.chat-bubble-ai {
+  background: var(--color-content-surface);
+  border: 1px solid var(--color-content-border);
+  color: var(--color-content-text);
+  border-radius: var(--radius-lg);
+  padding: 16px 24px;
+  max-width: 100%;
+  box-shadow: var(--shadow-card);
+}
+
+.chat-bubble-system {
+  background: #F9F8F4;
+  /* Rice paper */
+  color: #8C7C6D;
+  /* Warm Taupe */
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-content-border);
+}
+
+/* ---- Sidebar Thread Item (Minimal) ---- */
+.thread-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--color-sidebar-text-secondary);
+  font-size: 13px;
+  border-left: 2px solid transparent;
+}
+
+.thread-item:hover {
+  background: var(--color-sidebar-hover);
+  color: var(--color-sidebar-text);
+}
+
+.thread-item.active {
+  color: var(--color-sidebar-text);
+  background: var(--color-sidebar-surface);
+  font-weight: 600;
+  border-left-color: var(--color-accent-400);
+  /* Minimal active indicator */
+}
+
+/* ---- Tab styles (Artifact Panel - Clean) ---- */
+.artifact-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-content-text-muted);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  position: relative;
+  white-space: nowrap;
+}
+
+.artifact-tab:hover {
+  color: var(--color-content-text-secondary);
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.artifact-tab.active {
+  color: var(--color-accent-600);
+  /* Use Accent instead of Blue */
+  border-bottom-color: var(--color-accent-500);
+}
+
+/* ---- Animations ---- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Smoother zen easing */
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 3s ease-in-out infinite;
+  /* Slower pulse */
+}
+
+/* ---- Defensibility Score Ring (Neutral) ---- */
+.score-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.score-ring svg {
+  transform: rotate(-90deg);
+}
+
+.score-ring .score-value {
+  position: absolute;
+  font-weight: 600;
+  color: var(--color-content-text);
+}
+
+/* ── Artifact links in chat (Organic) ── */
+.artifact-link {
+  color: var(--color-accent-600);
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(93, 112, 82, 0.3);
+  /* Subtle underline */
+  transition: all 0.15s ease;
+}
+
+.artifact-link:hover {
+  color: var(--color-accent-700);
+  border-bottom-color: var(--color-accent-600);
+  background-color: var(--color-accent-50);
+}
+
+/* ── Sidebar collapse transitions ── */
+.sidebar-container {
+  transition: width 0.25s ease, opacity 0.2s ease;
+  overflow: hidden;
+}
+
+.sidebar-expand-btn {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 100;
+  width: 28px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-sidebar-bg);
+  border: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--color-sidebar-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.sidebar-expand-btn:hover {
+  color: white;
+  background: var(--color-accent-500);
+}
+
+/* ── Layout transitions ── */
+.main-content {
+  transition: flex 0.25s ease;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --background: oklch(0.98 0.005 100);
+  /* Rice Paper */
+  --foreground: oklch(0.20 0.01 100);
+  /* Warm Charcoal */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.20 0.01 100);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.20 0.01 100);
+  --primary: oklch(0.46 0.04 135);
+  /* Sage Green */
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.01 100);
+  --secondary-foreground: oklch(0.20 0.01 100);
+  --muted: oklch(0.95 0.01 100);
+  --muted-foreground: oklch(0.55 0.01 100);
+  --accent: oklch(0.95 0.02 135);
+  /* Sage Tint */
+  --accent-foreground: oklch(0.20 0.01 100);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.92 0.005 100);
+  --input: oklch(0.92 0.005 100);
+  --ring: oklch(0.46 0.04 135);
+  /* Match Primary */
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.5rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.20 0.01 100);
+  /* Warm Charcoal */
+  --foreground: oklch(0.98 0.005 100);
+  --card: oklch(0.25 0.01 100);
+  --card-foreground: oklch(0.98 0.005 100);
+  --popover: oklch(0.25 0.01 100);
+  --popover-foreground: oklch(0.98 0.005 100);
+  --primary: oklch(0.55 0.05 135);
+  /* Lighter Sage */
+  --primary-foreground: oklch(0.98 0.005 100);
+  --secondary: oklch(0.30 0.01 100);
+  --secondary-foreground: oklch(0.98 0.005 100);
+  --muted: oklch(0.30 0.01 100);
+  --muted-foreground: oklch(0.70 0.01 100);
+  --accent: oklch(0.30 0.02 135);
+  --accent-foreground: oklch(0.98 0.005 100);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.98 0.005 100);
+  --border: oklch(0.30 0.01 100);
+  --input: oklch(0.30 0.01 100);
+  --ring: oklch(0.55 0.05 135);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.448 0.243 264.376);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
