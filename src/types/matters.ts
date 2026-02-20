@@ -1,0 +1,85 @@
+export type MatterStatus =
+    | 'CREATED'
+    | 'BRIEF_ANALYZED'
+    | 'CLAIMS_PROPOSED'
+    | 'CLAIMS_APPROVED'
+    | 'RISK_REVIEWED'
+    | 'SPEC_GENERATED'
+    | 'QA_COMPLETE'
+    | 'LOCKED_FOR_EXPORT';
+
+export interface BriefUploadResponse {
+    id: string;
+    version_number: number;
+    is_authoritative: boolean;
+    structure_data: any;
+    message: string;
+}
+
+export interface BriefVersion {
+    id: string;
+    matter_id: string;
+    version_number: number;
+    is_authoritative: boolean;
+    structure_data: any;
+    created_at: string;
+}
+
+export interface ClaimNode {
+    id: string;
+    type: 'independent' | 'dependent';
+    text: string;
+    dependencies: string[];
+    category?: 'method' | 'system' | 'apparatus' | 'crm';
+}
+
+export interface ClaimGraph {
+    nodes: ClaimNode[];
+    risk_score?: number;
+}
+
+export interface ClaimGraphVersion {
+    id: string;
+    matter_id: string;
+    version_number: number;
+    description?: string;
+    is_authoritative: boolean;
+    graph_data: ClaimGraph;
+    created_at: string;
+}
+
+export interface Matter {
+    id: string;
+    title: string;
+    description?: string;
+    reference_number?: string;
+    status: MatterStatus;
+    jurisdictions: string[];
+    inventors?: string[];
+    assignee?: string;
+    tech_domain?: string;
+    defensibility_score?: number;
+    tenant_id: string;
+    attorney_id: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface MatterCreatePayload {
+    title: string;
+    description?: string;
+    jurisdictions: string[];
+    inventors?: string[];
+    assignee?: string;
+    tech_domain?: string;
+}
+
+export interface DocumentResponse {
+    id: string;
+    matter_id: string;
+    filename: string;
+    content_type: string;
+    total_pages: number;
+    status: 'processing' | 'ready' | 'failed';
+    created_at: string;
+}
