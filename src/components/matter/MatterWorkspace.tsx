@@ -12,7 +12,7 @@ import {
     mockWorkstreams,
 } from '@/data/mockData';
 import { Stage } from '@/components/ProgressTracker';
-import { Matter, BriefVersion, ClaimGraphVersion } from '@/types';
+import { Matter, BriefVersion, ClaimGraphVersion, Suggestion } from '@/types';
 
 type ArtifactTab = 'brief' | 'claims' | 'risk' | 'spec' | 'qa' | 'wrapper';
 
@@ -75,8 +75,11 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
     const [isApprovingBrief, setIsApprovingBrief] = useState(false);
     const [isGeneratingClaims, setIsGeneratingClaims] = useState(false);
     const [isCommittingClaims, setIsCommittingClaims] = useState(false);
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+    const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+    const [highlightedClaimId, setHighlightedClaimId] = useState<number | null>(null);
 
-    const DEMO_MATTER_ID = matterId === '1' ? "123e4567-e89b-12d3-a456-426614174000" : matterId;
+    const DEMO_MATTER_ID = matterId;
 
     // Fetch matter data
     const refreshMatter = useCallback(async () => {
@@ -116,11 +119,25 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
         }
     }, [DEMO_MATTER_ID]);
 
+    // Suggestions
+    const refreshSuggestions = useCallback(async () => {
+        setSuggestionsLoading(true);
+        try {
+            const resp = await mattersService.getSuggestions(DEMO_MATTER_ID);
+            setSuggestions(resp.suggestions);
+        } catch (err) {
+            console.error("Failed to fetch suggestions", err);
+        } finally {
+            setSuggestionsLoading(false);
+        }
+    }, [DEMO_MATTER_ID]);
+
     useEffect(() => {
         refreshMatter();
         refreshBrief();
         refreshClaims();
-    }, [refreshMatter, refreshBrief, refreshClaims]);
+        refreshSuggestions();
+    }, [refreshMatter, refreshBrief, refreshClaims, refreshSuggestions]);
 
     useEffect(() => {
         async function fetchDocs() {
@@ -139,7 +156,8 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
         await refreshBrief();
         await refreshMatter();
         setActiveTab('brief');
-    }, [refreshBrief, refreshMatter]);
+        refreshSuggestions();
+    }, [refreshBrief, refreshMatter, refreshSuggestions]);
 
     // Brief approval handler
     const handleApproveBrief = useCallback(async () => {
@@ -149,12 +167,13 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
             await mattersService.approveBrief(DEMO_MATTER_ID, briefVersion.id);
             await refreshBrief();
             await refreshMatter();
+            refreshSuggestions();
         } catch (err) {
             console.error("Failed to approve brief", err);
         } finally {
             setIsApprovingBrief(false);
         }
-    }, [DEMO_MATTER_ID, briefVersion, refreshBrief, refreshMatter]);
+    }, [DEMO_MATTER_ID, briefVersion, refreshBrief, refreshMatter, refreshSuggestions]);
 
     // Claims generation handler
     const handleGenerateClaims = useCallback(async () => {
@@ -165,12 +184,13 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
             await refreshClaims();
             await refreshMatter();
             setActiveTab('claims');
+            refreshSuggestions();
         } catch (err) {
             console.error("Failed to generate claims", err);
         } finally {
             setIsGeneratingClaims(false);
         }
-    }, [DEMO_MATTER_ID, briefVersion, refreshClaims, refreshMatter]);
+    }, [DEMO_MATTER_ID, briefVersion, refreshClaims, refreshMatter, refreshSuggestions]);
 
     // Claims commit handler
     const handleCommitClaims = useCallback(async () => {
@@ -180,14 +200,37 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
             await mattersService.commitClaims(DEMO_MATTER_ID, claimVersion.id);
             await refreshClaims();
             await refreshMatter();
+            refreshSuggestions();
         } catch (err) {
             console.error("Failed to commit claims", err);
         } finally {
             setIsCommittingClaims(false);
         }
-    }, [DEMO_MATTER_ID, claimVersion, refreshClaims, refreshMatter]);
+    }, [DEMO_MATTER_ID, claimVersion, refreshClaims, refreshMatter, refreshSuggestions]);
 
     const briefApproved = briefVersion?.is_authoritative === true;
+
+    // Action map: maps action_id strings to handler functions
+    const ACTION_MAP: Record<string, () => Promise<void>> = {
+        approve_brief: handleApproveBrief,
+        generate_claims: handleGenerateClaims,
+        commit_claims: handleCommitClaims,
+    };
+
+    const handleWorkflowAction = useCallback(async (actionId: string) => {
+        const handler = ACTION_MAP[actionId];
+        if (handler) {
+            await handler();
+        } else {
+            console.warn(`Unknown workflow action: ${actionId}`);
+        }
+    }, [handleApproveBrief, handleGenerateClaims, handleCommitClaims]);
+
+    const handleClaimNavigate = useCallback((claimId: number) => {
+        setActiveTab('claims');
+        setHighlightedClaimId(claimId);
+        setTimeout(() => setHighlightedClaimId(null), 3000);
+    }, []);
 
     const handleSendMessage = async (content: string) => {
         const userMsg: ChatMessage = {
@@ -380,6 +423,13 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
                 activeWorkstreamId={activeWorkstreamId}
                 onWorkstreamChange={handleWorkstreamChange}
                 onCreateWorkstream={handleCreateWorkstream}
+                suggestions={suggestions}
+                suggestionsLoading={suggestionsLoading}
+                onWorkflowAction={handleWorkflowAction}
+                onClaimNavigate={handleClaimNavigate}
+                claims={claims}
+                documents={documents}
+                briefVersion={briefVersion}
             />
             <ArtifactPreview
                 activeTab={activeTab}
@@ -398,6 +448,7 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
                 onCommitClaims={handleCommitClaims}
                 isCommittingClaims={isCommittingClaims}
                 briefApproved={briefApproved}
+                highlightedClaimId={highlightedClaimId}
             />
         </div>
     );

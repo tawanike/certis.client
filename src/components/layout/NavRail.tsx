@@ -1,25 +1,48 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Plus, Home } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import UserProfileDropdown from '@/components/UserProfileDropdown';
+import { mattersService } from '@/services/matters.service';
 
-// Mock recent matters — in production, pull from API/store
-const RECENT_MATTERS = [
-    { id: 'matter-001', title: 'Autonomous Drone Navigation', initials: 'AD', color: '#5b8def' },
-    { id: 'matter-002', title: 'Bio-Sensing Wearable Patch', initials: 'BW', color: '#e05252' },
-    { id: 'matter-003', title: 'Distributed Ledger Auth', initials: 'DL', color: '#34c28a' },
-];
+const COLORS = ['#5b8def', '#e05252', '#34c28a', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+function getInitials(title: string): string {
+    return title
+        .split(/\s+/)
+        .filter(w => w.length > 0)
+        .slice(0, 2)
+        .map(w => w[0].toUpperCase())
+        .join('');
+}
 
 export default function NavRail() {
     const router = useRouter();
     const pathname = usePathname();
+    const [matters, setMatters] = useState<{ id: string; title: string; initials: string; color: string }[]>([]);
 
     const isHome = pathname === '/';
     const activeMatterId = pathname.startsWith('/matter/')
         ? pathname.split('/')[2]
         : null;
+
+    useEffect(() => {
+        async function fetchMatters() {
+            try {
+                const data = await mattersService.list();
+                setMatters(data.map((m: { id: string; title: string }, i: number) => ({
+                    id: m.id,
+                    title: m.title,
+                    initials: getInitials(m.title),
+                    color: COLORS[i % COLORS.length],
+                })));
+            } catch {
+                // Not logged in or no matters yet
+            }
+        }
+        fetchMatters();
+    }, [pathname]);
 
     return (
         <div style={{
@@ -71,7 +94,7 @@ export default function NavRail() {
                 gap: 6,
                 overflowY: 'auto',
             }}>
-                {RECENT_MATTERS.map(matter => {
+                {matters.map(matter => {
                     const isActive = activeMatterId === matter.id;
                     return (
                         <div key={matter.id} style={{ position: 'relative' }}>
