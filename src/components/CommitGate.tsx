@@ -1,15 +1,57 @@
-import React from 'react';
-import { Check, X, GitCommit, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { Check, X, GitCommit, Code2 } from 'lucide-react';
 
 interface CommitGateProps {
     title: string;
     description: string;
     status: 'pending' | 'accepted' | 'rejected';
+    diff?: string;
     onAccept: () => void;
     onReject: () => void;
 }
 
-export default function CommitGate({ title, description, status, onAccept, onReject }: CommitGateProps) {
+function DiffView({ diff }: { diff: string }) {
+    const lines = diff.split('\n');
+    return (
+        <div
+            className="mt-3 rounded border border-[var(--color-content-border)] overflow-hidden"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}
+        >
+            {lines.map((line, i) => {
+                const isRemoval = line.startsWith('-');
+                const isAddition = line.startsWith('+');
+                return (
+                    <div
+                        key={i}
+                        style={{
+                            padding: '3px 10px',
+                            background: isRemoval
+                                ? 'rgba(220, 38, 38, 0.08)'
+                                : isAddition
+                                    ? 'rgba(22, 163, 74, 0.08)'
+                                    : 'transparent',
+                            color: isRemoval
+                                ? 'var(--color-danger, #dc2626)'
+                                : isAddition
+                                    ? 'var(--color-success, #16a34a)'
+                                    : 'var(--color-content-text-secondary)',
+                            textDecoration: isRemoval ? 'line-through' : 'none',
+                            borderBottom: i < lines.length - 1 ? '1px solid var(--color-content-border)' : 'none',
+                            whiteSpace: 'pre-wrap',
+                            lineHeight: 1.6,
+                        }}
+                    >
+                        {line}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+export default function CommitGate({ title, description, status, diff, onAccept, onReject }: CommitGateProps) {
+    const [showDiff, setShowDiff] = useState(false);
+
     if (status !== 'pending') {
         return (
             <div className={`
@@ -37,7 +79,7 @@ export default function CommitGate({ title, description, status, onAccept, onRej
             <div className="bg-[var(--color-content-raised)] px-4 py-2 border-b border-[var(--color-content-border)] flex items-center gap-2">
                 <GitCommit size={16} className="text-[var(--color-accent-500)]" />
                 <span className="text-[12px] font-bold text-[var(--color-content-text)] uppercase tracking-wider">
-                    Proposed Change
+                    Proposed Changes
                 </span>
             </div>
 
@@ -50,22 +92,42 @@ export default function CommitGate({ title, description, status, onAccept, onRej
                     {description}
                 </p>
 
-                {/* Actions */}
-                <div className="flex gap-3">
-                    <button
-                        onClick={onReject}
-                        className="flex-1 py-2 px-3 rounded text-[13px] font-medium border border-[var(--color-content-border)] text-[var(--color-content-text-muted)] hover:bg-[var(--color-content-bg-hover)] transition-colors"
-                    >
-                        Reject
-                    </button>
+                {/* Diff view (above buttons when visible) */}
+                {showDiff && diff && <DiffView diff={diff} />}
+
+                {/* Three-button row */}
+                <div className={`flex gap-2 ${showDiff && diff ? 'mt-3' : ''}`}>
                     <button
                         onClick={onAccept}
-                        className="flex-1 py-2 px-3 rounded text-[13px] font-medium bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] transition-colors flex items-center justify-center gap-2 shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 rounded text-[13px] font-medium bg-[var(--color-content-text)] text-[var(--color-content-surface)] hover:opacity-90 transition-opacity"
                     >
                         <Check size={14} />
-                        Approve & Merge
+                        Review & Merge
                     </button>
+                    <button
+                        onClick={onReject}
+                        className="flex items-center gap-2 px-3 py-2 rounded text-[13px] font-medium border border-[var(--color-content-border)] text-[var(--color-content-text-secondary)] hover:bg-[var(--color-content-bg-hover)] transition-colors"
+                    >
+                        <X size={14} />
+                        Reject
+                    </button>
+                    {diff && (
+                        <button
+                            onClick={() => setShowDiff(!showDiff)}
+                            className="flex items-center gap-2 px-3 py-2 rounded text-[13px] font-medium border border-[var(--color-content-border)] text-[var(--color-content-text-secondary)] hover:bg-[var(--color-content-bg-hover)] transition-colors ml-auto"
+                        >
+                            <Code2 size={14} />
+                            {showDiff ? 'Hide Diff' : 'Compare Diff'}
+                        </button>
+                    )}
                 </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-2 border-t border-[var(--color-content-border)] bg-[var(--color-content-bg)]">
+                <p className="text-[11px] text-[var(--color-content-text-muted)] m-0">
+                    Changes are sandboxed until merged.
+                </p>
             </div>
         </div>
     );

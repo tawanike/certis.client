@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronRight, ChevronRightSquare, CheckCircle, ShieldCheck, Loader2, Sparkles } from 'lucide-react';
 import { type Claim, claimTree as defaultTree } from '@/data/mockData';
 import HoverableText from './HoverableText';
@@ -15,15 +15,28 @@ interface ClaimTreeProps {
     onGenerate?: () => void;
     isGenerating?: boolean;
     briefApproved?: boolean;
+    highlightedClaimId?: number | null;
 }
 
-function ClaimNode({ claim, depth, onAddToChat, isLastChild = false }: {
+function ClaimNode({ claim, depth, onAddToChat, isLastChild = false, highlightedClaimId }: {
     claim: Claim;
     depth: number;
     onAddToChat?: (text: string) => void;
     isLastChild?: boolean;
+    highlightedClaimId?: number | null;
 }) {
     const [isExpanded, setIsExpanded] = useState(true);
+    const [isHighlighted, setIsHighlighted] = useState(false);
+    const nodeRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (highlightedClaimId === claim.id && nodeRef.current) {
+            nodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setIsHighlighted(true);
+            const timer = setTimeout(() => setIsHighlighted(false), 2500);
+            return () => clearTimeout(timer);
+        }
+    }, [highlightedClaimId, claim.id]);
 
     const isIndependent = claim.type === 'independent';
     const hasChildren = claim.children && claim.children.length > 0;
@@ -77,19 +90,18 @@ function ClaimNode({ claim, depth, onAddToChat, isLastChild = false }: {
                 </>
             )}
 
-            <div style={{
+            <div ref={nodeRef} style={{
                 marginBottom: 12,
                 position: 'relative',
                 zIndex: 1,
             }}>
                 <div style={{
                     padding: '12px 14px',
-                    background: 'var(--color-content-surface)',
-                    border: '1px solid var(--color-content-border)',
-                    // Removed colored borderLeft
-                    borderRadius: '2px', // Flat UI: Sharper corners
-                    transition: 'all 0.15s ease',
-                    boxShadow: 'none', // Flat UI: No shadow
+                    background: isHighlighted ? 'var(--color-accent-50)' : 'var(--color-content-surface)',
+                    border: isHighlighted ? '2px solid var(--color-accent-500)' : '1px solid var(--color-content-border)',
+                    borderRadius: '2px',
+                    transition: 'all 0.3s ease',
+                    boxShadow: isHighlighted ? '0 0 0 3px rgba(93, 112, 82, 0.15)' : 'none',
                 }}>
                     {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -181,6 +193,7 @@ function ClaimNode({ claim, depth, onAddToChat, isLastChild = false }: {
                             depth={depth + 1}
                             onAddToChat={onAddToChat}
                             isLastChild={idx === (claim.children?.length || 0) - 1}
+                            highlightedClaimId={highlightedClaimId}
                         />
                     ))}
                 </div>
@@ -189,7 +202,7 @@ function ClaimNode({ claim, depth, onAddToChat, isLastChild = false }: {
     );
 }
 
-export default function ClaimTree({ claims = defaultTree, onAddToChat, isSandbox = false, isAuthoritative, onCommit, isCommitting, onGenerate, isGenerating, briefApproved }: ClaimTreeProps) {
+export default function ClaimTree({ claims = defaultTree, onAddToChat, isSandbox = false, isAuthoritative, onCommit, isCommitting, onGenerate, isGenerating, briefApproved, highlightedClaimId }: ClaimTreeProps) {
     const hasClaims = claims && claims.length > 0;
 
     // Empty state: no claims yet
@@ -303,6 +316,7 @@ export default function ClaimTree({ claims = defaultTree, onAddToChat, isSandbox
                         claim={claim}
                         depth={0}
                         onAddToChat={onAddToChat}
+                        highlightedClaimId={highlightedClaimId}
                     />
                 ))}
             </div>

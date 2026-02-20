@@ -41,6 +41,7 @@ interface ArtifactPreviewProps {
     onCommitClaims?: () => void;
     isCommittingClaims?: boolean;
     briefApproved?: boolean;
+    highlightedClaimId?: number | null;
 }
 
 const TABS: { id: ArtifactTab; label: string; icon: React.ElementType }[] = [
@@ -173,6 +174,7 @@ export default function ArtifactPreview({
     activeTab, onTabChange, claims = defaultClaims, onAddToChat, fileWrapperDocs = [],
     matterId, briefVersion, onBriefUploadSuccess, onApproveBrief, isApprovingBrief,
     claimVersion, onGenerateClaims, isGeneratingClaims, onCommitClaims, isCommittingClaims, briefApproved,
+    highlightedClaimId,
 }: ArtifactPreviewProps) {
     return (
         <div style={{
@@ -254,6 +256,7 @@ export default function ArtifactPreview({
                         onGenerate={onGenerateClaims}
                         isGenerating={isGeneratingClaims}
                         briefApproved={briefApproved}
+                        highlightedClaimId={highlightedClaimId}
                     />
                 )}
                 {activeTab === 'risk' && <RiskDashboard onAddToChat={onAddToChat} />}

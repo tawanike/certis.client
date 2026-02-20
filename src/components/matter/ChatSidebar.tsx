@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Copy, Sparkles, ArrowLeft } from 'lucide-react';
+import { Send, Paperclip, Copy, Sparkles, ArrowLeft, FileText, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import { ChatMessage, chatMessages as defaultMessages, Workstream, WorkstreamType } from '@/data/mockData';
+import { ChatMessage, DocumentReference, chatMessages as defaultMessages, Workstream, WorkstreamType } from '@/data/mockData';
 import CommitGate from '@/components/CommitGate';
 import ContextualPrompts from '@/components/ContextualPrompts';
 import WorkstreamPills from './WorkstreamPills';
 import { Stage } from '@/components/ProgressTracker';
+import { Suggestion } from '@/types';
+import MentionPopover, { MentionItem, buildMentionItems } from './MentionPopover';
+import type { Claim } from '@/data/mockData';
 
 // Artifact keyword → tab mapping
 const ARTIFACT_PATTERNS: Array<{ pattern: RegExp; tab: string }> = [
@@ -17,25 +20,54 @@ const ARTIFACT_PATTERNS: Array<{ pattern: RegExp; tab: string }> = [
     { pattern: /\b(QA\s*(?:tab|Validation|check))\b/gi, tab: 'qa' },
 ];
 
-function renderTextWithLinks(text: string, onNavigate?: (tab: string) => void): React.ReactNode[] {
-    if (!onNavigate) return [text];
-    const allPatterns = ARTIFACT_PATTERNS.map(p => `(${p.pattern.source})`).join('|');
-    const combinedRegex = new RegExp(allPatterns, 'gi');
+function renderTextWithLinks(
+    text: string,
+    onNavigate?: (tab: string) => void,
+    onClaimNavigate?: (claimId: number) => void,
+): React.ReactNode[] {
+    if (!onNavigate && !onClaimNavigate) return [text];
+
+    // Combine artifact patterns + individual claim references
+    const artifactSources = ARTIFACT_PATTERNS.map(p => `(${p.pattern.source})`).join('|');
+    const claimSource = '(Claim\\s+\\d+)';
+    const combinedRegex = new RegExp(`${artifactSources}|${claimSource}`, 'gi');
+
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = combinedRegex.exec(text)) !== null) {
         if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
         const matchedText = match[0];
-        const patternInfo = ARTIFACT_PATTERNS.find(p => new RegExp(p.pattern.source, 'gi').test(matchedText));
-        if (patternInfo) {
+
+        // Check if it's an individual claim ref (e.g. "Claim 1") but NOT "Claim Tree", "Claims tab", etc.
+        const isClaimRef = /^Claim\s+\d+$/i.test(matchedText) && !/tree|tab|set/i.test(matchedText);
+
+        if (isClaimRef && onClaimNavigate) {
+            const claimId = parseInt(matchedText.replace(/\D/g, ''), 10);
             parts.push(
-                <span key={match.index} className="artifact-link" onClick={() => onNavigate(patternInfo.tab)} title={`Open ${patternInfo.tab}`}>
+                <span
+                    key={match.index}
+                    className="artifact-link claim-link"
+                    onClick={() => {
+                        onNavigate?.('claims');
+                        onClaimNavigate(claimId);
+                    }}
+                    title={`Go to Claim ${claimId}`}
+                >
                     {matchedText}
                 </span>
             );
         } else {
-            parts.push(matchedText);
+            const patternInfo = ARTIFACT_PATTERNS.find(p => new RegExp(p.pattern.source, 'gi').test(matchedText));
+            if (patternInfo && onNavigate) {
+                parts.push(
+                    <span key={match.index} className="artifact-link" onClick={() => onNavigate(patternInfo.tab)} title={`Open ${patternInfo.tab}`}>
+                        {matchedText}
+                    </span>
+                );
+            } else {
+                parts.push(matchedText);
+            }
         }
         lastIndex = match.index + matchedText.length;
     }
@@ -43,10 +75,10 @@ function renderTextWithLinks(text: string, onNavigate?: (tab: string) => void): 
     return parts;
 }
 
-function formatContent(content: string, onNavigate?: (tab: string) => void) {
+function formatContent(content: string, onNavigate?: (tab: string) => void, onClaimNavigate?: (claimId: number) => void) {
     const lines = content.split('\n');
     return lines.map((line, i) => {
-        const render = (t: string) => renderTextWithLinks(t.replace(/\*\*/g, ''), onNavigate);
+        const render = (t: string) => renderTextWithLinks(t.replace(/\*\*/g, ''), onNavigate, onClaimNavigate);
         if (line.startsWith('**') && line.endsWith('**')) {
             return <h4 key={i} style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-content-text)', margin: '6px 0 3px' }}>{render(line)}</h4>;
         } else if (line.startsWith('**') && line.includes(':**')) {
@@ -54,7 +86,7 @@ function formatContent(content: string, onNavigate?: (tab: string) => void) {
             return (
                 <p key={i} style={{ margin: '2px 0', fontSize: 12.5, lineHeight: 1.6 }}>
                     <strong style={{ color: 'var(--color-content-text)' }}>{parts[0].replace(/\*\*/g, '')}:</strong>
-                    {renderTextWithLinks(parts.slice(1).join(':**').replace(/\*\*/g, ''), onNavigate)}
+                    {renderTextWithLinks(parts.slice(1).join(':**').replace(/\*\*/g, ''), onNavigate, onClaimNavigate)}
                 </p>
             );
         } else if (line.startsWith('- ') || line.startsWith('• ')) {
@@ -65,6 +97,162 @@ function formatContent(content: string, onNavigate?: (tab: string) => void) {
             return <p key={i} style={{ margin: '1px 0', fontSize: 12.5, lineHeight: 1.6, color: 'var(--color-content-text-secondary)' }}>{render(line)}</p>;
         }
     });
+}
+
+// System message keyword highlighting
+const SYSTEM_KEYWORDS = /\b(CLAIM\s+\d+|UPDATED|PASSED|FAILED|DEFENSIBILITY\s+SCORE|ADJUSTED\s+TO\s+\d+|ANTECEDENT\s+BASIS\s+CHECK|LOCKED|MERGED|APPROVED|REJECTED)\b/gi;
+
+function formatSystemMessage(content: string): React.ReactNode[] {
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    const regex = new RegExp(SYSTEM_KEYWORDS.source, 'gi');
+    while ((match = regex.exec(content)) !== null) {
+        if (match.index > lastIndex) parts.push(content.slice(lastIndex, match.index));
+        parts.push(
+            <span key={match.index} style={{
+                fontWeight: 700,
+                color: 'var(--color-content-text)',
+                background: 'var(--color-accent-50)',
+                padding: '0 3px',
+                borderRadius: 2,
+            }}>
+                {match[0]}
+            </span>
+        );
+        lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < content.length) parts.push(content.slice(lastIndex));
+    return parts;
+}
+
+// Expandable citation card for document references
+function CitationCard({ reference, msgId, idx, isExpanded, onToggle }: {
+    reference: DocumentReference;
+    msgId: string;
+    idx: number;
+    isExpanded: boolean;
+    onToggle: () => void;
+}) {
+    return (
+        <div
+            onClick={onToggle}
+            style={{
+                fontSize: 11,
+                padding: isExpanded ? '8px 10px' : '3px 8px',
+                background: 'var(--color-content-bg)',
+                border: '1px solid var(--color-content-border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-content-text-secondary)',
+                cursor: 'pointer',
+                maxWidth: isExpanded ? '100%' : 260,
+                transition: 'all 0.15s ease',
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <FileText size={11} style={{ color: 'var(--color-accent-500)', flexShrink: 0 }} />
+                <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {reference.filename}
+                </span>
+                <span style={{ color: 'var(--color-content-text-muted)', fontSize: 10, flexShrink: 0 }}>
+                    p.{reference.page_number}
+                    {reference.chunk_index !== undefined && ` · §${reference.chunk_index + 1}`}
+                </span>
+                <ChevronDown
+                    size={10}
+                    style={{
+                        marginLeft: 'auto',
+                        transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.15s ease',
+                        color: 'var(--color-content-text-muted)',
+                        flexShrink: 0,
+                    }}
+                />
+            </div>
+            {isExpanded && (
+                <p style={{
+                    margin: '6px 0 0',
+                    fontSize: 11,
+                    lineHeight: 1.5,
+                    color: 'var(--color-content-text-muted)',
+                    borderTop: '1px solid var(--color-content-border)',
+                    paddingTop: 6,
+                    whiteSpace: 'pre-wrap',
+                    maxHeight: 80,
+                    overflow: 'hidden',
+                }}>
+                    {reference.content}
+                </p>
+            )}
+        </div>
+    );
+}
+
+// Render @[...] and #[...] mentions as styled pills
+const MENTION_REGEX = /(@\[([^\]]+)\]|#\[([^\]]+)\])/g;
+
+function renderMentions(
+    text: string,
+    onNavigate?: (tab: string) => void,
+    onClaimNavigate?: (claimId: number) => void,
+): React.ReactNode[] {
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    const regex = new RegExp(MENTION_REGEX.source, 'g');
+
+    while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+
+        const isAt = match[0].startsWith('@');
+        const label = match[2] || match[3]; // group 2 for @, group 3 for #
+
+        if (isAt) {
+            parts.push(
+                <span key={match.index} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 3,
+                    padding: '0 6px',
+                    borderRadius: 'var(--radius-full, 999px)',
+                    background: 'var(--color-accent-50)',
+                    color: 'var(--color-accent-700)',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    verticalAlign: 'baseline',
+                }}>
+                    @{label}
+                </span>
+            );
+        } else {
+            // # claim reference
+            const claimMatch = label.match(/Claim\s+(\d+)/i);
+            const claimId = claimMatch ? parseInt(claimMatch[1], 10) : null;
+            parts.push(
+                <span
+                    key={match.index}
+                    onClick={claimId ? () => {
+                        onNavigate?.('claims');
+                        onClaimNavigate?.(claimId);
+                    } : undefined}
+                    style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                        padding: '0 6px',
+                        borderRadius: 'var(--radius-full, 999px)',
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        color: 'var(--color-primary, #3b82f6)',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: claimId ? 'pointer' : 'default',
+                        verticalAlign: 'baseline',
+                    }}
+                >
+                    #{label}
+                </span>
+            );
+        }
+        lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+    return parts;
 }
 
 const LAWYERLY_PHRASES = [
@@ -120,6 +308,14 @@ interface ChatSidebarProps {
     activeWorkstreamId?: string;
     onWorkstreamChange?: (id: string) => void;
     onCreateWorkstream?: (type: WorkstreamType, label: string) => void;
+    suggestions?: Suggestion[];
+    suggestionsLoading?: boolean;
+    onWorkflowAction?: (actionId: string) => void;
+    onClaimNavigate?: (claimId: number) => void;
+    // Mention data sources
+    claims?: Claim[];
+    documents?: Array<{ id: string; filename: string; total_pages?: number; status?: string }>;
+    briefVersion?: { id: string; version_number: number; is_authoritative: boolean } | null;
 }
 
 export default function ChatSidebar({
@@ -136,10 +332,31 @@ export default function ChatSidebar({
     activeWorkstreamId,
     onWorkstreamChange,
     onCreateWorkstream,
+    suggestions = [],
+    suggestionsLoading = false,
+    onWorkflowAction,
+    onClaimNavigate,
+    claims: claimsProp = [],
+    documents: documentsProp = [],
+    briefVersion: briefVersionProp,
 }: ChatSidebarProps) {
     const [inputValue, setInputValue] = useState('');
+    const [expandedCitations, setExpandedCitations] = useState<Record<string, boolean>>({});
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    // Mention state
+    const [mentionOpen, setMentionOpen] = useState(false);
+    const [mentionTrigger, setMentionTrigger] = useState<'@' | '#'>('@');
+    const [mentionQuery, setMentionQuery] = useState('');
+    const [mentionStartPos, setMentionStartPos] = useState(0);
+    const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
+
+    const { atItems, hashItems } = buildMentionItems(documentsProp, claimsProp, briefVersionProp);
+    const mentionItems = mentionTrigger === '@' ? atItems : hashItems;
+    const filteredMentionItems = mentionItems.filter(
+        (item) => item.label.toLowerCase().includes(mentionQuery.toLowerCase())
+    );
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -157,9 +374,78 @@ export default function ChatSidebar({
         if (!inputValue.trim()) return;
         onSendMessage?.(inputValue);
         setInputValue('');
+        setMentionOpen(false);
+    };
+
+    const handleMentionSelect = (item: MentionItem) => {
+        const prefix = mentionTrigger === '@' ? '@' : '#';
+        const insertText = `${prefix}[${item.label}]`;
+        const before = inputValue.slice(0, mentionStartPos);
+        const after = inputValue.slice(mentionStartPos + mentionQuery.length + 1); // +1 for trigger char
+        const newValue = before + insertText + ' ' + after;
+        setInputValue(newValue);
+        setMentionOpen(false);
+        setTimeout(() => inputRef.current?.focus(), 0);
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const value = e.target.value;
+        setInputValue(value);
+
+        // Detect mention triggers
+        const cursorPos = e.target.selectionStart || 0;
+        const textBeforeCursor = value.slice(0, cursorPos);
+
+        // Find the last @ or # that starts a mention (not preceded by a word char)
+        const atMatch = textBeforeCursor.match(/(?:^|[\s(])(@)(\w*)$/);
+        const hashMatch = textBeforeCursor.match(/(?:^|[\s(])(#)(\w*)$/);
+
+        if (atMatch) {
+            const triggerIdx = textBeforeCursor.lastIndexOf('@');
+            setMentionOpen(true);
+            setMentionTrigger('@');
+            setMentionQuery(atMatch[2] || '');
+            setMentionStartPos(triggerIdx);
+            setMentionActiveIndex(0);
+        } else if (hashMatch) {
+            const triggerIdx = textBeforeCursor.lastIndexOf('#');
+            setMentionOpen(true);
+            setMentionTrigger('#');
+            setMentionQuery(hashMatch[2] || '');
+            setMentionStartPos(triggerIdx);
+            setMentionActiveIndex(0);
+        } else {
+            setMentionOpen(false);
+        }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (mentionOpen && filteredMentionItems.length > 0) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setMentionActiveIndex((prev) =>
+                    prev < filteredMentionItems.length - 1 ? prev + 1 : 0
+                );
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setMentionActiveIndex((prev) =>
+                    prev > 0 ? prev - 1 : filteredMentionItems.length - 1
+                );
+                return;
+            }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                handleMentionSelect(filteredMentionItems[mentionActiveIndex]);
+                return;
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setMentionOpen(false);
+                return;
+            }
+        }
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
@@ -245,7 +531,7 @@ export default function ChatSidebar({
                         return (
                             <div key={msg.id} style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}>
                                 <div className="chat-bubble-system" style={{ fontSize: 11 }}>
-                                    {msg.content}
+                                    {formatSystemMessage(msg.content)}
                                 </div>
                             </div>
                         );
@@ -257,7 +543,9 @@ export default function ChatSidebar({
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', maxWidth: '85%' }}>
                                     <span style={{ fontSize: 10, color: 'var(--color-content-text-muted)', marginBottom: 3 }}>{msg.timestamp}</span>
                                     <div className="chat-bubble-user" style={{ padding: '8px 12px' }}>
-                                        <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5 }}>{msg.content}</p>
+                                        <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5 }}>
+                                            {renderMentions(msg.content, onArtifactNavigate, onClaimNavigate)}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -294,7 +582,7 @@ export default function ChatSidebar({
                                 )}
                                 <div className="chat-bubble-ai" style={{ padding: '8px 12px' }}>
                                     {msg.content ? (
-                                        formatContent(msg.content, onArtifactNavigate)
+                                        formatContent(msg.content, onArtifactNavigate, onClaimNavigate)
                                     ) : (
                                         <TypingIndicator isDrafting={!!msg.thinking} />
                                     )}
@@ -302,26 +590,23 @@ export default function ChatSidebar({
                                 {msg.references && msg.references.length > 0 && (
                                     <div style={{ marginTop: 6, padding: '6px 8px', background: 'var(--color-content-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-content-border)' }}>
                                         <p style={{ margin: '0 0 4px', fontSize: 9, fontWeight: 700, color: 'var(--color-content-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sources Used</p>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                            {msg.references.map((ref, idx) => (
-                                                <div key={idx} title={ref.content} style={{
-                                                    fontSize: 10, padding: '2px 6px',
-                                                    background: 'var(--color-content-bg)',
-                                                    border: '1px solid var(--color-content-border)',
-                                                    borderRadius: 'var(--radius-sm)',
-                                                    color: 'var(--color-content-text-secondary)',
-                                                    cursor: 'help',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: 4,
-                                                    maxWidth: 180
-                                                }}>
-                                                    <Paperclip size={10} style={{ color: 'var(--color-content-text-muted)' }} />
-                                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                        {ref.filename} • p.{ref.page_number}
-                                                    </span>
-                                                </div>
-                                            ))}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                            {msg.references.map((ref, idx) => {
+                                                const citationKey = `${msg.id}-${idx}`;
+                                                return (
+                                                    <CitationCard
+                                                        key={idx}
+                                                        reference={ref}
+                                                        msgId={msg.id}
+                                                        idx={idx}
+                                                        isExpanded={!!expandedCitations[citationKey]}
+                                                        onToggle={() => setExpandedCitations(prev => ({
+                                                            ...prev,
+                                                            [citationKey]: !prev[citationKey]
+                                                        }))}
+                                                    />
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
@@ -330,6 +615,7 @@ export default function ChatSidebar({
                                         title={msg.proposal.title}
                                         description={msg.proposal.description}
                                         status={msg.proposal.status}
+                                        diff={msg.proposal.diff}
                                         onAccept={() => onProposalAction?.(msg.id, 'accept')}
                                         onReject={() => onProposalAction?.(msg.id, 'reject')}
                                     />
@@ -348,8 +634,10 @@ export default function ChatSidebar({
 
             {/* Contextual Prompts */}
             <ContextualPrompts
-                stage={currentStage}
+                suggestions={suggestions}
                 onPromptSelect={(text) => setInputValue(text)}
+                onWorkflowAction={(actionId) => onWorkflowAction?.(actionId)}
+                isLoading={suggestionsLoading}
             />
 
             {/* Input Bar */}
@@ -366,7 +654,19 @@ export default function ChatSidebar({
                     border: '1px solid var(--color-content-border)',
                     borderRadius: 'var(--radius-lg)',
                     transition: 'border-color 0.15s ease',
+                    position: 'relative',
                 }}>
+                    {/* Mention Popover */}
+                    {mentionOpen && filteredMentionItems.length > 0 && (
+                        <MentionPopover
+                            items={mentionItems}
+                            query={mentionQuery}
+                            triggerChar={mentionTrigger}
+                            onSelect={handleMentionSelect}
+                            onClose={() => setMentionOpen(false)}
+                            activeIndex={mentionActiveIndex}
+                        />
+                    )}
                     <button style={{
                         background: 'none', border: 'none', cursor: 'pointer',
                         color: 'var(--color-content-text-muted)', padding: 2,
@@ -377,9 +677,10 @@ export default function ChatSidebar({
                     <textarea
                         ref={inputRef}
                         value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
+                        onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
-                        placeholder="Ask Certis AI..."
+                        onBlur={() => setTimeout(() => setMentionOpen(false), 150)}
+                        placeholder="Ask Certis AI... (@ files, # claims)"
                         rows={inputValue.includes('\n') ? 3 : 1}
                         style={{
                             flex: 1, background: 'none', border: 'none', outline: 'none',

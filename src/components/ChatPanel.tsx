@@ -6,6 +6,7 @@ import { ChatMessage, chatMessages as defaultMessages } from '@/data/mockData';
 import CommitGate from './CommitGate';
 import ContextualPrompts from './ContextualPrompts';
 import { Stage } from './ProgressTracker';
+import { Suggestion } from '@/types';
 
 interface ChatPanelProps {
     messages?: ChatMessage[];
@@ -138,6 +139,35 @@ function formatMessageContent(content: string, onNavigate?: (tab: string) => voi
 
     return elements;
 }
+
+const STAGE_SUGGESTIONS: Record<Stage, Suggestion[]> = {
+    brief: [
+        { label: "Summarize the invention disclosure", type: "chat_prompt", prompt: "Summarize the invention disclosure" },
+        { label: "Identify key novel features", type: "chat_prompt", prompt: "Identify key novel features" },
+        { label: "List potential competitors", type: "chat_prompt", prompt: "List potential competitors" },
+    ],
+    claims: [
+        { label: "Check for antecedent basis issues", type: "chat_prompt", prompt: "Check for antecedent basis issues" },
+        { label: "Expand on the fallback mechanism", type: "chat_prompt", prompt: "Expand on the fallback mechanism" },
+        { label: "Draft a dependent claim", type: "chat_prompt", prompt: "Draft a dependent claim for the camera fusion" },
+    ],
+    risk: [
+        { label: "Analyze potential 112(b) indefiniteness", type: "chat_prompt", prompt: "Analyze potential 112(b) indefiniteness" },
+        { label: "Search for prior art", type: "chat_prompt", prompt: "Search for prior art on LiDAR weight adjustment" },
+    ],
+    spec: [
+        { label: "Generate a summary of the invention", type: "chat_prompt", prompt: "Generate a summary of the invention" },
+        { label: "Create an abstract", type: "chat_prompt", prompt: "Create an abstract based on independent claims" },
+    ],
+    qa: [
+        { label: "Verify all reference numbers", type: "chat_prompt", prompt: "Verify all reference numbers are used" },
+        { label: "Check claim numbering", type: "chat_prompt", prompt: "Check claim numbering sequence" },
+    ],
+    export: [
+        { label: "Generate USPTO-ready PDF", type: "chat_prompt", prompt: "Generate USPTO-ready PDF" },
+        { label: "Export claim tree to Word", type: "chat_prompt", prompt: "Export claim tree to Word" },
+    ],
+};
 
 export default function ChatPanel({
     messages = defaultMessages,
@@ -359,8 +389,9 @@ export default function ChatPanel({
 
             {/* Contextual Prompts */}
             <ContextualPrompts
-                stage={currentStage}
+                suggestions={STAGE_SUGGESTIONS[currentStage] || STAGE_SUGGESTIONS['claims']}
                 onPromptSelect={(text) => setInputValue(text)}
+                onWorkflowAction={() => {}}
             />
 
             {/* Input Bar */}

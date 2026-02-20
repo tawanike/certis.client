@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import { BriefUploadResponse, BriefVersion, ClaimGraphVersion, Matter, MatterCreatePayload, DocumentResponse } from "@/types";
+import { BriefUploadResponse, BriefVersion, ClaimGraphVersion, Matter, MatterCreatePayload, DocumentResponse, SuggestionsResponse } from "@/types";
 
 export const mattersService = {
     async uploadBrief(matterId: string, file: File): Promise<BriefUploadResponse> {
@@ -50,5 +50,9 @@ export const mattersService = {
 
     async commitClaims(matterId: string, versionId: string): Promise<ClaimGraphVersion> {
         return api.post<ClaimGraphVersion>(`/matters/${matterId}/claims/${versionId}/commit`);
+    },
+
+    async getSuggestions(matterId: string): Promise<SuggestionsResponse> {
+        return api.get<SuggestionsResponse>(`/matters/${matterId}/suggestions`);
     },
 };

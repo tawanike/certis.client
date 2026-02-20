@@ -28,6 +28,8 @@ export interface DocumentReference {
     filename: string;
     page_number: number;
     content: string;
+    document_id?: string;
+    chunk_index?: number;
 }
 
 export interface ChatMessage {
