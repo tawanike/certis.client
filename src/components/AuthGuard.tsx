@@ -19,10 +19,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         if (!isMounted) return
 
         // Allow public access to login and invite pages
-        if (pathname === '/login' || pathname?.startsWith('/invite')) return
+        if (pathname === '/auth/login' || pathname?.startsWith('/auth/invite')) return
 
         if (!isAuthenticated) {
-            router.push('/login')
+            router.push('/auth/login')
         }
     }, [isAuthenticated, isMounted, pathname, router])
 
@@ -30,7 +30,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!isMounted) return null
 
     // Allow access to public pages even if not authenticated
-    if (pathname === '/login' || pathname?.startsWith('/invite')) {
+    if (pathname === '/auth/login' || pathname?.startsWith('/auth/invite')) {
         return <>{children}</>
     }
 

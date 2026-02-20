@@ -89,7 +89,7 @@ export default function InvitePage() {
                         <CardDescription>{error}</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Button onClick={() => router.push("/login")} variant="outline" className="w-full">
+                        <Button onClick={() => router.push("/auth/login")} variant="outline" className="w-full">
                             Go to Login
                         </Button>
                     </CardContent>
