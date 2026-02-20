@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Certis Web
 
-## Getting Started
+Next.js frontend for the Certis patent drafting platform. Deployed to **Vercel**.
 
-First, run the development server:
+## Tech Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Framework**: Next.js 16 (App Router)
+- **UI**: React 19, Radix UI, shadcn/ui, Tailwind CSS 4
+- **State**: Zustand (persisted auth store)
+- **Animations**: Framer Motion
+- **Testing**: Vitest + React Testing Library + JSDOM
+
+## Project Structure
+
+```
+src/
+├── app/                # Next.js App Router pages
+│   ├── auth/           # Login, registration, invitation flows
+│   ├── matter/         # Matter detail views (claims, risk, specs, chat)
+│   ├── layout.tsx      # Root layout
+│   └── page.tsx        # Dashboard
+├── components/         # React components by domain
+│   ├── auth/           # Auth forms, guards
+│   ├── briefs/         # Brief upload and viewer
+│   ├── chat/           # Chat panel with SSE streaming
+│   ├── claims/         # Claim tree, diff views
+│   ├── intake/         # Invention intake forms
+│   ├── matter/         # Matter views and cards
+│   ├── risks/          # Risk dashboard, scoring
+│   ├── specs/          # Specification viewer
+│   ├── layout/         # App shell, sidebar, topbar
+│   └── ui/             # shadcn/Radix UI primitives
+├── services/           # API client layer
+│   ├── auth.service.ts
+│   ├── clients.service.ts
+│   ├── invitation.service.ts
+│   └── matters.service.ts
+├── stores/             # Zustand stores
+│   └── authStore.ts    # JWT token, user state, persistence
+├── types/              # TypeScript interfaces
+│   ├── auth.ts
+│   ├── matters.ts
+│   └── invitation.ts
+├── lib/                # Utilities
+│   └── api.ts          # Base fetch wrapper (auto JWT, 401 logout)
+└── data/               # Static/mock data
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+```
 
-## Learn More
+### Run
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run dev        # Dev server on :3000
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Build & Check
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run build      # Production build
+npm run lint       # ESLint
+npm run typecheck  # TypeScript checking
+npm test           # Vitest
+```
 
-## Deploy on Vercel
+## Environment Variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Variable | Default | Description |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000/v1` | Backend API base URL |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For production (Vercel), set `NEXT_PUBLIC_API_URL` to the production backend URL in the Vercel project settings.
+
+## Deployment
+
+The frontend is deployed to **Vercel** and connects to the backend API server via `NEXT_PUBLIC_API_URL`.
+
+### Vercel Setup
+
+1. Connect the repository to Vercel
+2. Set the root directory to `web/`
+3. Set environment variable: `NEXT_PUBLIC_API_URL=https://api.your-domain.com/v1`
+4. Deploy
+
+### API Connection
+
+All API calls go through `src/lib/api.ts` which:
+- Prepends `NEXT_PUBLIC_API_URL` to all endpoints
+- Auto-attaches JWT bearer tokens from the auth store
+- Handles `FormData` uploads (strips `Content-Type` for multipart)
+- Auto-logs out on `401` responses
