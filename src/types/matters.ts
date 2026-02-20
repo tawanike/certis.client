@@ -74,6 +74,18 @@ export interface MatterCreatePayload {
     tech_domain?: string;
 }
 
+export interface Suggestion {
+    label: string;
+    type: 'chat_prompt' | 'workflow_action';
+    action_id?: string;
+    prompt?: string;
+}
+
+export interface SuggestionsResponse {
+    suggestions: Suggestion[];
+    matter_status: string;
+}
+
 export interface DocumentResponse {
     id: string;
     matter_id: string;
