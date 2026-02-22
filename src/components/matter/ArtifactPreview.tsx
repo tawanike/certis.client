@@ -47,6 +47,8 @@ interface ArtifactPreviewProps {
     isGeneratingRisk?: boolean;
     onCommitRisk?: () => void;
     isCommittingRisk?: boolean;
+    onReEvaluateRisk?: () => void;
+    isReEvaluatingRisk?: boolean;
     claimsApproved?: boolean;
     // Spec flow
     specVersion?: SpecVersion | null;
@@ -482,7 +484,7 @@ export default function ArtifactPreview({
     matterId, briefVersion, onBriefUploadSuccess, onApproveBrief, isApprovingBrief,
     claimVersion, onGenerateClaims, isGeneratingClaims, onCommitClaims, isCommittingClaims, briefApproved,
     highlightedClaimId,
-    riskVersion, onGenerateRisk, isGeneratingRisk, onCommitRisk, isCommittingRisk, claimsApproved,
+    riskVersion, onGenerateRisk, isGeneratingRisk, onCommitRisk, isCommittingRisk, onReEvaluateRisk, isReEvaluatingRisk, claimsApproved,
     specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpec, isCommittingSpec, riskApproved,
     qaVersion, onRunQA, isRunningQA, onCommitQA, isCommittingQA, specApproved,
     matterStatus, onLockForExport, isLocking, onExportDocx, isExporting,
@@ -577,7 +579,10 @@ export default function ArtifactPreview({
                         isGeneratingRisk={isGeneratingRisk}
                         onCommitRisk={onCommitRisk}
                         isCommittingRisk={isCommittingRisk}
+                        onReEvaluateRisk={onReEvaluateRisk}
+                        isReEvaluatingRisk={isReEvaluatingRisk}
                         claimsApproved={claimsApproved}
+                        specApproved={specApproved}
                         onAddToChat={onAddToChat}
                     />
                 )}

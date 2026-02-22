@@ -33,13 +33,13 @@ export default function BriefUpload({ matterId, onUploadSuccess }: BriefUploadPr
     return (
         <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-blue-500 transition-colors">
             <h3 className="text-lg font-semibold mb-2">Upload Invention Disclosure</h3>
-            <p className="text-gray-500 mb-4">Upload a PDF or Text file to generate a Structured Brief.</p>
+            <p className="text-gray-500 mb-4">Upload a PDF, DOCX, or Text file to generate a Structured Brief.</p>
 
             {error && <div className="text-red-500 mb-4">{error}</div>}
 
             <input
                 type="file"
-                accept=".pdf,.txt"
+                accept=".pdf,.txt,.docx"
                 onChange={handleFileChange}
                 disabled={isUploading}
                 className="block w-full text-sm text-gray-500

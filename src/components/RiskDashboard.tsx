@@ -54,13 +54,16 @@ interface RiskDashboardProps {
     isGeneratingRisk?: boolean;
     onCommitRisk?: () => void;
     isCommittingRisk?: boolean;
+    onReEvaluateRisk?: () => void;
+    isReEvaluatingRisk?: boolean;
     claimsApproved?: boolean;
+    specApproved?: boolean;
     onAddToChat?: (text: string) => void;
 }
 
 export default function RiskDashboard({
     riskVersion, onGenerateRisk, isGeneratingRisk, onCommitRisk, isCommittingRisk,
-    claimsApproved, onAddToChat,
+    onReEvaluateRisk, isReEvaluatingRisk, claimsApproved, specApproved, onAddToChat,
 }: RiskDashboardProps) {
     // Empty state
     if (!riskVersion) {
@@ -220,12 +223,30 @@ export default function RiskDashboard({
                 </button>
             )}
             {riskVersion.is_authoritative && (
-                <div style={{
-                    padding: '8px 16px', borderRadius: 'var(--radius-sm)',
-                    background: 'var(--color-accent-50)', color: 'var(--color-accent-700)',
-                    fontSize: 13, fontWeight: 600, display: 'inline-block',
-                }}>
-                    Risk Analysis Approved
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{
+                        padding: '8px 16px', borderRadius: 'var(--radius-sm)',
+                        background: 'var(--color-accent-50)', color: 'var(--color-accent-700)',
+                        fontSize: 13, fontWeight: 600, display: 'inline-block',
+                    }}>
+                        Risk Analysis Approved
+                    </div>
+                    {specApproved && onReEvaluateRisk && (
+                        <button
+                            onClick={onReEvaluateRisk}
+                            disabled={isReEvaluatingRisk}
+                            style={{
+                                padding: '8px 20px', borderRadius: 'var(--radius-sm)',
+                                border: 'none', background: 'var(--color-accent-500)',
+                                color: 'white', fontSize: 13, fontWeight: 600,
+                                cursor: isReEvaluatingRisk ? 'wait' : 'pointer',
+                                opacity: isReEvaluatingRisk ? 0.7 : 1,
+                                width: 'fit-content',
+                            }}
+                        >
+                            {isReEvaluatingRisk ? 'Re-evaluating After Specification...' : 'Re-evaluate After Specification'}
+                        </button>
+                    )}
                 </div>
             )}
         </div>

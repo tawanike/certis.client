@@ -75,6 +75,7 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
     const [qaVersion, setQAVersion] = useState<QAReportVersion | null>(null);
     const [isRunningQA, setIsRunningQA] = useState(false);
     const [isCommittingQA, setIsCommittingQA] = useState(false);
+    const [isReEvaluatingRisk, setIsReEvaluatingRisk] = useState(false);
     const [isLocking, setIsLocking] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
 
@@ -313,6 +314,22 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
         }
     }, [DEMO_MATTER_ID, specVersion, refreshSpec, refreshMatter, refreshSuggestions]);
 
+    // Risk re-evaluation handler
+    const handleReEvaluateRisk = useCallback(async () => {
+        setIsReEvaluatingRisk(true);
+        try {
+            await mattersService.reEvaluateRisk(DEMO_MATTER_ID);
+            await refreshRisk();
+            await refreshMatter();
+            setActiveTab('risk');
+            refreshSuggestions();
+        } catch (err) {
+            console.error("Failed to re-evaluate risk", err);
+        } finally {
+            setIsReEvaluatingRisk(false);
+        }
+    }, [DEMO_MATTER_ID, refreshRisk, refreshMatter, refreshSuggestions]);
+
     // QA generation handler
     const handleRunQA = useCallback(async () => {
         setIsRunningQA(true);
@@ -394,6 +411,7 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
         commit_claims: handleCommitClaims,
         generate_risk: handleGenerateRisk,
         commit_risk: handleCommitRisk,
+        re_evaluate_risk: handleReEvaluateRisk,
         generate_spec: handleGenerateSpec,
         commit_spec: handleCommitSpec,
         run_qa: handleRunQA,
@@ -408,7 +426,7 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
         } else {
             console.warn(`Unknown workflow action: ${actionId}`);
         }
-    }, [handleApproveBrief, handleGenerateClaims, handleCommitClaims, handleGenerateRisk, handleCommitRisk, handleGenerateSpec, handleCommitSpec, handleRunQA, handleCommitQA, handleLockForExport]);
+    }, [handleApproveBrief, handleGenerateClaims, handleCommitClaims, handleGenerateRisk, handleCommitRisk, handleReEvaluateRisk, handleGenerateSpec, handleCommitSpec, handleRunQA, handleCommitQA, handleLockForExport]);
 
     const handleClaimNavigate = useCallback((claimId: number) => {
         setActiveTab('claims');
@@ -435,7 +453,7 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
         setMessages(prev => [...prev, userMsg, aiMsg]);
 
         try {
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+            const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/v1";
             const { useAuthStore } = await import('@/stores/authStore');
             const token = useAuthStore.getState().token;
             const response = await fetch(`${apiBase}/matters/${DEMO_MATTER_ID}/stream`, {
@@ -576,6 +594,8 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
                 isGeneratingRisk={isGeneratingRisk}
                 onCommitRisk={handleCommitRisk}
                 isCommittingRisk={isCommittingRisk}
+                onReEvaluateRisk={handleReEvaluateRisk}
+                isReEvaluatingRisk={isReEvaluatingRisk}
                 claimsApproved={claimsApproved}
                 specVersion={specVersion}
                 onGenerateSpec={handleGenerateSpec}

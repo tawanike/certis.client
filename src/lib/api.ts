@@ -1,6 +1,6 @@
 import { useAuthStore } from "@/stores/authStore";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/v1";
 
 // Generic fetch wrapper to handle auth
 export async function apiFetch<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {

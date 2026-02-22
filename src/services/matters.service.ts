@@ -106,6 +106,12 @@ export const mattersService = {
         return api.post<RiskAnalysisVersion>(`/matters/${matterId}/risk/${versionId}/commit`);
     },
 
+    async reEvaluateRisk(matterId: string, specVersionId?: string): Promise<RiskAnalysisVersion> {
+        const body: Record<string, string> = {};
+        if (specVersionId) body.spec_version_id = specVersionId;
+        return api.post<RiskAnalysisVersion>(`/matters/${matterId}/risk/re-evaluate`, body);
+    },
+
     async generateSpecification(matterId: string, claimVersionId?: string, riskVersionId?: string): Promise<SpecVersion> {
         const body: Record<string, string> = {};
         if (claimVersionId) body.claim_version_id = claimVersionId;
