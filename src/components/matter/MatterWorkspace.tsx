@@ -6,7 +6,7 @@ import { mattersService } from '@/services/matters.service';
 import ArtifactPreview from './ArtifactPreview';
 import { ChatMessage, Claim, Matter, BriefVersion, ClaimGraphVersion, Suggestion, QAReportVersion, RiskAnalysisVersion, SpecVersion } from '@/types';
 
-type ArtifactTab = 'brief' | 'claims' | 'risk' | 'spec' | 'qa' | 'wrapper';
+type ArtifactTab = 'brief' | 'claims' | 'risk' | 'spec' | 'qa' | 'wrapper' | 'draft';
 
 // Convert backend ClaimNode format to the Claim tree format used by ClaimTree component
 function convertClaimGraphToClaims(graphData: any): Claim[] {
@@ -78,6 +78,7 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
     const [isReEvaluatingRisk, setIsReEvaluatingRisk] = useState(false);
     const [isLocking, setIsLocking] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
 
     const DEMO_MATTER_ID = matterId;
 
@@ -396,6 +397,70 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
         }
     }, [DEMO_MATTER_ID]);
 
+    // Export PDF handler
+    const handleExportPdf = useCallback(async () => {
+        setIsExportingPdf(true);
+        try {
+            const blob = await mattersService.exportPdf(DEMO_MATTER_ID);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `patent_${DEMO_MATTER_ID}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Failed to export PDF", err);
+        } finally {
+            setIsExportingPdf(false);
+        }
+    }, [DEMO_MATTER_ID]);
+
+    // Claims editing handlers
+    const handleEditClaim = useCallback(async (nodeId: string, patch: { text?: string; type?: string; category?: string; dependencies?: string[] }) => {
+        if (!claimVersion) return;
+        await mattersService.editClaim(DEMO_MATTER_ID, claimVersion.id, nodeId, patch);
+        await refreshClaims();
+        await refreshMatter();
+    }, [DEMO_MATTER_ID, claimVersion, refreshClaims, refreshMatter]);
+
+    const handleAddClaim = useCallback(async (body: { type: string; text: string; category?: string; dependencies?: string[] }) => {
+        if (!claimVersion) return;
+        await mattersService.addClaim(DEMO_MATTER_ID, claimVersion.id, body);
+        await refreshClaims();
+        await refreshMatter();
+    }, [DEMO_MATTER_ID, claimVersion, refreshClaims, refreshMatter]);
+
+    const handleDeleteClaim = useCallback(async (nodeId: string) => {
+        if (!claimVersion) return;
+        await mattersService.deleteClaim(DEMO_MATTER_ID, claimVersion.id, nodeId);
+        await refreshClaims();
+        await refreshMatter();
+    }, [DEMO_MATTER_ID, claimVersion, refreshClaims, refreshMatter]);
+
+    // Spec editing handlers
+    const handleEditSpecParagraph = useCallback(async (paragraphId: string, patch: { text?: string; section?: string; claim_references?: string[] }) => {
+        if (!specVersion) return;
+        await mattersService.editSpecParagraph(DEMO_MATTER_ID, specVersion.id, paragraphId, patch);
+        await refreshSpec();
+        await refreshMatter();
+    }, [DEMO_MATTER_ID, specVersion, refreshSpec, refreshMatter]);
+
+    const handleAddSpecParagraph = useCallback(async (body: { section: string; text: string; claim_references?: string[]; after_paragraph_id?: string }) => {
+        if (!specVersion) return;
+        await mattersService.addSpecParagraph(DEMO_MATTER_ID, specVersion.id, body);
+        await refreshSpec();
+        await refreshMatter();
+    }, [DEMO_MATTER_ID, specVersion, refreshSpec, refreshMatter]);
+
+    const handleDeleteSpecParagraph = useCallback(async (paragraphId: string) => {
+        if (!specVersion) return;
+        await mattersService.deleteSpecParagraph(DEMO_MATTER_ID, specVersion.id, paragraphId);
+        await refreshSpec();
+        await refreshMatter();
+    }, [DEMO_MATTER_ID, specVersion, refreshSpec, refreshMatter]);
+
     const briefApproved = briefVersion?.is_authoritative === true;
     const CLAIMS_APPROVED_STATUSES: string[] = ['CLAIMS_APPROVED', 'RISK_REVIEWED', 'SPEC_GENERATED', 'RISK_RE_REVIEWED', 'QA_COMPLETE', 'LOCKED_FOR_EXPORT'];
     const claimsApproved = matter?.status ? CLAIMS_APPROVED_STATUSES.includes(matter.status) : false;
@@ -403,6 +468,12 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
     const riskApproved = matter?.status ? RISK_APPROVED_STATUSES.includes(matter.status) : false;
     const SPEC_APPROVED_STATUSES: string[] = ['SPEC_GENERATED', 'RISK_RE_REVIEWED', 'QA_COMPLETE', 'LOCKED_FOR_EXPORT'];
     const specApproved = matter?.status ? SPEC_APPROVED_STATUSES.includes(matter.status) : false;
+
+    const CLAIMS_EDITABLE_STATUSES: string[] = ['CLAIMS_PROPOSED', 'CLAIMS_APPROVED'];
+    const isClaimsEditable = matter?.status ? CLAIMS_EDITABLE_STATUSES.includes(matter.status) : false;
+
+    const SPEC_EDITABLE_STATUSES: string[] = ['RISK_REVIEWED', 'SPEC_GENERATED', 'RISK_RE_REVIEWED'];
+    const isSpecEditable = matter?.status ? SPEC_EDITABLE_STATUSES.includes(matter.status) : false;
 
     // Action map: maps action_id strings to handler functions
     const ACTION_MAP: Record<string, () => Promise<void>> = {
@@ -614,6 +685,18 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
                 isLocking={isLocking}
                 onExportDocx={handleExportDocx}
                 isExporting={isExporting}
+                onExportPdf={handleExportPdf}
+                isExportingPdf={isExportingPdf}
+                isClaimsEditable={isClaimsEditable}
+                claimVersionId={claimVersion?.id}
+                onEditClaim={handleEditClaim}
+                onAddClaim={handleAddClaim}
+                onDeleteClaim={handleDeleteClaim}
+                isSpecEditable={isSpecEditable}
+                specVersionId={specVersion?.id}
+                onEditSpecParagraph={handleEditSpecParagraph}
+                onAddSpecParagraph={handleAddSpecParagraph}
+                onDeleteSpecParagraph={handleDeleteSpecParagraph}
             />
         </div>
     );

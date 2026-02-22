@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
     PenTool,
     Shield,
@@ -10,6 +10,14 @@ import {
     AlertTriangle,
     AlertCircle,
     FolderOpen,
+    FileText,
+    Pencil,
+    Trash2,
+    Plus,
+    X,
+    Save,
+    Download,
+    Loader2,
 } from 'lucide-react';
 import ClaimTree from '@/components/ClaimTree';
 import RiskDashboard from '@/components/RiskDashboard';
@@ -17,9 +25,9 @@ import BriefUpload from '@/components/BriefUpload';
 import BriefViewer from '@/components/BriefViewer';
 import HoverableText from '@/components/HoverableText';
 import FileWrapperViewer from './FileWrapperViewer';
-import { type Claim, DocumentResponse, BriefVersion, ClaimGraphVersion, QAReportVersion, RiskAnalysisVersion, SpecVersion } from '@/types';
+import { type Claim, type SpecParagraph, DocumentResponse, BriefVersion, ClaimGraphVersion, QAReportVersion, RiskAnalysisVersion, SpecVersion } from '@/types';
 
-type ArtifactTab = 'brief' | 'claims' | 'risk' | 'spec' | 'qa' | 'wrapper';
+type ArtifactTab = 'brief' | 'claims' | 'risk' | 'spec' | 'qa' | 'wrapper' | 'draft';
 
 interface ArtifactPreviewProps {
     activeTab: ArtifactTab;
@@ -70,6 +78,20 @@ interface ArtifactPreviewProps {
     isLocking?: boolean;
     onExportDocx?: () => void;
     isExporting?: boolean;
+    onExportPdf?: () => void;
+    isExportingPdf?: boolean;
+    // Claims editing
+    isClaimsEditable?: boolean;
+    claimVersionId?: string;
+    onEditClaim?: (nodeId: string, patch: { text?: string; type?: string; category?: string; dependencies?: string[] }) => Promise<void>;
+    onAddClaim?: (body: { type: string; text: string; category?: string; dependencies?: string[] }) => Promise<void>;
+    onDeleteClaim?: (nodeId: string) => Promise<void>;
+    // Spec editing
+    isSpecEditable?: boolean;
+    specVersionId?: string;
+    onEditSpecParagraph?: (paragraphId: string, patch: { text?: string; section?: string; claim_references?: string[] }) => Promise<void>;
+    onAddSpecParagraph?: (body: { section: string; text: string; claim_references?: string[]; after_paragraph_id?: string }) => Promise<void>;
+    onDeleteSpecParagraph?: (paragraphId: string) => Promise<void>;
 }
 
 const TABS: { id: ArtifactTab; label: string; icon: React.ElementType }[] = [
@@ -79,6 +101,7 @@ const TABS: { id: ArtifactTab; label: string; icon: React.ElementType }[] = [
     { id: 'spec', label: 'Spec', icon: BookOpen },
     { id: 'qa', label: 'QA', icon: CheckCircle },
     { id: 'wrapper', label: 'File Wrapper', icon: FolderOpen },
+    { id: 'draft', label: 'Draft', icon: FileText },
 ];
 
 // ---- Spec Viewer ----
@@ -92,7 +115,7 @@ const SECTION_LABELS: Record<string, string> = {
     abstract: 'Abstract',
 };
 
-function SpecViewer({ specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpec, isCommittingSpec, riskApproved, onAddToChat }: {
+function SpecViewer({ specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpec, isCommittingSpec, riskApproved, onAddToChat, isEditable, onEditParagraph, onAddParagraph, onDeleteParagraph }: {
     specVersion?: SpecVersion | null;
     onGenerateSpec?: () => void;
     isGeneratingSpec?: boolean;
@@ -100,7 +123,20 @@ function SpecViewer({ specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpe
     isCommittingSpec?: boolean;
     riskApproved?: boolean;
     onAddToChat?: (text: string) => void;
+    isEditable?: boolean;
+    onEditParagraph?: (paragraphId: string, patch: { text?: string; section?: string; claim_references?: string[] }) => Promise<void>;
+    onAddParagraph?: (body: { section: string; text: string; claim_references?: string[]; after_paragraph_id?: string }) => Promise<void>;
+    onDeleteParagraph?: (paragraphId: string) => Promise<void>;
 }) {
+    const [editingParaId, setEditingParaId] = useState<string | null>(null);
+    const [editText, setEditText] = useState('');
+    const [editSection, setEditSection] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [addAfterSection, setAddAfterSection] = useState<string | null>(null);
+    const [addText, setAddText] = useState('');
+    const [isAdding, setIsAdding] = useState(false);
+
     // Empty state
     if (!specVersion) {
         return (
@@ -134,7 +170,6 @@ function SpecViewer({ specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpe
 
     const doc = specVersion.content_data;
 
-    // Group paragraphs by section
     const groupedSections = doc.sections.reduce<Record<string, typeof doc.sections>>((acc, para) => {
         if (!acc[para.section]) acc[para.section] = [];
         acc[para.section].push(para);
@@ -143,6 +178,58 @@ function SpecViewer({ specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpe
 
     const sectionOrder = ['technical_field', 'background', 'summary', 'detailed_description', 'definitions', 'figure_descriptions', 'abstract'];
     const orderedKeys = sectionOrder.filter(k => groupedSections[k]);
+
+    const handleStartEdit = (para: SpecParagraph) => {
+        setEditingParaId(para.id);
+        setEditText(para.text);
+        setEditSection(para.section);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingParaId || !onEditParagraph) return;
+        setIsSaving(true);
+        try {
+            const origPara = doc.sections.find(p => p.id === editingParaId);
+            const patch: { text?: string; section?: string } = {};
+            if (editText !== origPara?.text) patch.text = editText;
+            if (editSection !== origPara?.section) patch.section = editSection;
+            if (Object.keys(patch).length > 0) {
+                await onEditParagraph(editingParaId, patch);
+            }
+            setEditingParaId(null);
+        } catch (err) {
+            console.error("Failed to edit paragraph", err);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleDeleteParagraph = async (paraId: string) => {
+        if (!onDeleteParagraph) return;
+        setIsSaving(true);
+        try {
+            await onDeleteParagraph(paraId);
+            setConfirmDeleteId(null);
+        } catch (err) {
+            console.error("Failed to delete paragraph", err);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleAddParagraph = async (sectionKey: string, afterId?: string) => {
+        if (!onAddParagraph || !addText.trim()) return;
+        setIsAdding(true);
+        try {
+            await onAddParagraph({ section: sectionKey, text: addText, after_paragraph_id: afterId });
+            setAddText('');
+            setAddAfterSection(null);
+        } catch (err) {
+            console.error("Failed to add paragraph", err);
+        } finally {
+            setIsAdding(false);
+        }
+    };
 
     return (
         <div style={{ padding: 28, maxWidth: 800 }}>
@@ -181,17 +268,123 @@ function SpecViewer({ specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpe
                         {SECTION_LABELS[sectionKey] || sectionKey}
                     </h4>
                     {groupedSections[sectionKey].map((para) => (
-                        <div key={para.id} style={{ marginBottom: 12 }}>
-                            <HoverableText text={para.text} onAddToChat={onAddToChat}>
-                                <p style={{
-                                    margin: 0, fontSize: 13, lineHeight: 1.8,
-                                    color: 'var(--color-content-text-secondary)',
-                                    whiteSpace: 'pre-wrap',
-                                }}>
-                                    {para.text}
-                                </p>
-                            </HoverableText>
-                            {para.claim_references.length > 0 && (
+                        <div key={para.id} style={{ marginBottom: 12, position: 'relative' }}>
+                            {editingParaId === para.id ? (
+                                <div style={{ border: '1px solid var(--color-accent-300)', borderRadius: 'var(--radius-sm)', padding: 10 }}>
+                                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                                        <select
+                                            value={editSection}
+                                            onChange={e => setEditSection(e.target.value)}
+                                            style={{ fontSize: 11, padding: '4px 6px', borderRadius: 2, border: '1px solid var(--color-content-border)' }}
+                                        >
+                                            {sectionOrder.map(s => (
+                                                <option key={s} value={s}>{SECTION_LABELS[s] || s}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <textarea
+                                        value={editText}
+                                        onChange={e => setEditText(e.target.value)}
+                                        rows={6}
+                                        style={{
+                                            width: '100%', fontSize: 13, lineHeight: 1.8, padding: 8, marginBottom: 8,
+                                            border: '1px solid var(--color-content-border)', borderRadius: 2,
+                                            background: 'var(--color-content-bg)', color: 'var(--color-content-text)',
+                                            resize: 'vertical', fontFamily: 'inherit',
+                                        }}
+                                    />
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                        <button
+                                            onClick={handleSaveEdit}
+                                            disabled={isSaving}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 4,
+                                                padding: '4px 12px', borderRadius: 2, border: 'none',
+                                                background: 'var(--color-accent-500)', color: 'white',
+                                                fontSize: 12, fontWeight: 600, cursor: isSaving ? 'wait' : 'pointer',
+                                            }}
+                                        >
+                                            <Save size={12} />
+                                            {isSaving ? 'Saving...' : 'Save'}
+                                        </button>
+                                        <button
+                                            onClick={() => setEditingParaId(null)}
+                                            style={{
+                                                padding: '4px 12px', borderRadius: 2,
+                                                border: '1px solid var(--color-content-border)', background: 'var(--color-content-surface)',
+                                                color: 'var(--color-content-text)', fontSize: 12, cursor: 'pointer',
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                        <div style={{ flex: 1 }}>
+                                            <HoverableText text={para.text} onAddToChat={onAddToChat}>
+                                                <p style={{
+                                                    margin: 0, fontSize: 13, lineHeight: 1.8,
+                                                    color: 'var(--color-content-text-secondary)',
+                                                    whiteSpace: 'pre-wrap',
+                                                }}>
+                                                    {para.text}
+                                                </p>
+                                            </HoverableText>
+                                        </div>
+                                        {isEditable && (
+                                            <div style={{ display: 'flex', gap: 2, flexShrink: 0, marginTop: 2 }}>
+                                                <button
+                                                    onClick={() => handleStartEdit(para)}
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--color-content-text-muted)' }}
+                                                    title="Edit paragraph"
+                                                >
+                                                    <Pencil size={13} />
+                                                </button>
+                                                <button
+                                                    onClick={() => setConfirmDeleteId(para.id)}
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--color-content-text-muted)' }}
+                                                    title="Delete paragraph"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {confirmDeleteId === para.id && (
+                                        <div style={{
+                                            padding: '6px 10px', marginTop: 6, borderRadius: 2,
+                                            background: 'var(--color-danger-bg, #fef2f2)', border: '1px solid var(--color-danger, #ef4444)',
+                                            display: 'flex', alignItems: 'center', gap: 8,
+                                        }}>
+                                            <span style={{ fontSize: 12, color: 'var(--color-danger)', flex: 1 }}>Delete this paragraph?</span>
+                                            <button
+                                                onClick={() => handleDeleteParagraph(para.id)}
+                                                disabled={isSaving}
+                                                style={{
+                                                    padding: '2px 10px', borderRadius: 2, border: 'none',
+                                                    background: 'var(--color-danger, #ef4444)', color: 'white',
+                                                    fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                                                }}
+                                            >
+                                                {isSaving ? 'Deleting...' : 'Confirm'}
+                                            </button>
+                                            <button
+                                                onClick={() => setConfirmDeleteId(null)}
+                                                style={{
+                                                    padding: '2px 10px', borderRadius: 2,
+                                                    border: '1px solid var(--color-content-border)', background: 'var(--color-content-surface)',
+                                                    color: 'var(--color-content-text)', fontSize: 11, cursor: 'pointer',
+                                                }}
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            {para.claim_references.length > 0 && editingParaId !== para.id && (
                                 <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
                                     {para.claim_references.map((ref, i) => (
                                         <span key={i} style={{
@@ -206,6 +399,75 @@ function SpecViewer({ specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpe
                             )}
                         </div>
                     ))}
+
+                    {/* Add Paragraph button at end of each section */}
+                    {isEditable && onAddParagraph && (
+                        <>
+                            {addAfterSection === sectionKey ? (
+                                <div style={{
+                                    marginTop: 8, padding: 10, borderRadius: 2,
+                                    border: '1px solid var(--color-content-border)',
+                                    background: 'var(--color-content-surface)',
+                                }}>
+                                    <textarea
+                                        placeholder="New paragraph text..."
+                                        value={addText}
+                                        onChange={e => setAddText(e.target.value)}
+                                        rows={4}
+                                        style={{
+                                            width: '100%', fontSize: 13, lineHeight: 1.8, padding: 8, marginBottom: 8,
+                                            border: '1px solid var(--color-content-border)', borderRadius: 2,
+                                            background: 'var(--color-content-bg)', color: 'var(--color-content-text)',
+                                            resize: 'vertical', fontFamily: 'inherit',
+                                        }}
+                                    />
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                        <button
+                                            onClick={() => {
+                                                const lastPara = groupedSections[sectionKey]?.[groupedSections[sectionKey].length - 1];
+                                                handleAddParagraph(sectionKey, lastPara?.id);
+                                            }}
+                                            disabled={isAdding || !addText.trim()}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 4,
+                                                padding: '4px 12px', borderRadius: 2, border: 'none',
+                                                background: 'var(--color-accent-500)', color: 'white',
+                                                fontSize: 12, fontWeight: 600, cursor: isAdding ? 'wait' : 'pointer',
+                                                opacity: (!addText.trim() || isAdding) ? 0.6 : 1,
+                                            }}
+                                        >
+                                            <Plus size={12} />
+                                            {isAdding ? 'Adding...' : 'Add'}
+                                        </button>
+                                        <button
+                                            onClick={() => { setAddAfterSection(null); setAddText(''); }}
+                                            style={{
+                                                padding: '4px 12px', borderRadius: 2,
+                                                border: '1px solid var(--color-content-border)', background: 'var(--color-content-surface)',
+                                                color: 'var(--color-content-text)', fontSize: 12, cursor: 'pointer',
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setAddAfterSection(sectionKey)}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 4, marginTop: 6,
+                                        padding: '4px 10px', borderRadius: 2,
+                                        border: '1px dashed var(--color-content-border)',
+                                        background: 'transparent', color: 'var(--color-content-text-muted)',
+                                        fontSize: 11, cursor: 'pointer',
+                                    }}
+                                >
+                                    <Plus size={12} />
+                                    Add Paragraph
+                                </button>
+                            )}
+                        </>
+                    )}
                 </div>
             ))}
 
@@ -329,13 +591,17 @@ function QAViewer({ qaVersion, onRunQA, isRunningQA, onCommitQA, isCommittingQA,
                 </div>
             </div>
 
-            {/* Findings */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-                {report.findings.map((finding) => (
+            {/* Findings — grouped by severity */}
+            {(() => {
+                const errors = report.findings.filter(f => f.severity === 'error');
+                const warnings = report.findings.filter(f => f.severity === 'warning');
+
+                const renderFinding = (finding: typeof report.findings[0], borderColor: string) => (
                     <div key={finding.id} style={{
                         padding: '10px 14px',
                         borderRadius: 'var(--radius-sm)',
                         border: '1px solid var(--color-content-border)',
+                        borderLeft: `3px solid ${borderColor}`,
                         background: 'var(--color-content-surface)',
                         display: 'flex', alignItems: 'flex-start', gap: 10,
                     }}>
@@ -364,8 +630,43 @@ function QAViewer({ qaVersion, onRunQA, isRunningQA, onCommitQA, isCommittingQA,
                             </div>
                         </div>
                     </div>
-                ))}
-            </div>
+                );
+
+                return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
+                        {errors.length > 0 && (
+                            <div>
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
+                                    fontSize: 12, fontWeight: 700, color: 'var(--color-danger)',
+                                    textTransform: 'uppercase', letterSpacing: '0.04em',
+                                }}>
+                                    <AlertCircle size={14} />
+                                    Errors — Must Resolve ({errors.length})
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {errors.map(f => renderFinding(f, 'var(--color-danger)'))}
+                                </div>
+                            </div>
+                        )}
+                        {warnings.length > 0 && (
+                            <div>
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
+                                    fontSize: 12, fontWeight: 700, color: 'var(--color-warning, #f59e0b)',
+                                    textTransform: 'uppercase', letterSpacing: '0.04em',
+                                }}>
+                                    <AlertTriangle size={14} />
+                                    Warnings ({warnings.length})
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {warnings.map(f => renderFinding(f, 'var(--color-warning, #f59e0b)'))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
 
             {/* Summary */}
             {report.summary && (
@@ -444,6 +745,154 @@ function QAViewer({ qaVersion, onRunQA, isRunningQA, onCommitQA, isCommittingQA,
     );
 }
 
+// ---- Draft Preview ----
+function DraftPreview({ briefVersion, claimVersion, specVersion, matterStatus, matterTitle, onExportDocx, isExporting, onExportPdf, isExportingPdf }: {
+    briefVersion?: BriefVersion | null;
+    claimVersion?: ClaimGraphVersion | null;
+    specVersion?: SpecVersion | null;
+    matterStatus?: string;
+    matterTitle?: string;
+    onExportDocx?: () => void;
+    isExporting?: boolean;
+    onExportPdf?: () => void;
+    isExportingPdf?: boolean;
+}) {
+    const isReady = matterStatus === 'QA_COMPLETE' || matterStatus === 'LOCKED_FOR_EXPORT';
+
+    if (!isReady) {
+        return (
+            <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                height: '100%', padding: 40, gap: 16,
+            }}>
+                <FileText size={32} style={{ color: 'var(--color-content-text-muted)' }} />
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-content-text-secondary)', textAlign: 'center' }}>
+                    Complete QA validation to preview the draft patent application.
+                </p>
+            </div>
+        );
+    }
+
+    const brief = briefVersion?.structure_data;
+    const claims = claimVersion?.graph_data?.nodes || [];
+    const spec = specVersion?.content_data;
+
+    // Group spec sections
+    const specSections: Record<string, { id: string; text: string; claim_references: string[] }[]> = {};
+    if (spec?.sections) {
+        for (const para of spec.sections) {
+            if (!specSections[para.section]) specSections[para.section] = [];
+            specSections[para.section].push(para);
+        }
+    }
+
+    const specSectionOrder = [
+        ['technical_field', 'Technical Field'],
+        ['background', 'Background of the Invention'],
+        ['summary', 'Summary of the Invention'],
+        ['detailed_description', 'Detailed Description of Preferred Embodiments'],
+        ['definitions', 'Definitions'],
+        ['figure_descriptions', 'Description of Figures'],
+    ] as const;
+
+    return (
+        <div style={{ padding: 28, maxWidth: 800 }}>
+            {/* Export buttons */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+                {matterStatus === 'LOCKED_FOR_EXPORT' && onExportDocx && (
+                    <button
+                        onClick={onExportDocx}
+                        disabled={isExporting}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '6px 16px', borderRadius: 'var(--radius-sm)',
+                            border: 'none', background: 'var(--color-accent-500)',
+                            color: 'white', fontSize: 12, fontWeight: 600,
+                            cursor: isExporting ? 'wait' : 'pointer',
+                            opacity: isExporting ? 0.7 : 1,
+                        }}
+                    >
+                        <Download size={14} />
+                        {isExporting ? 'Generating...' : 'Export DOCX'}
+                    </button>
+                )}
+                {matterStatus === 'LOCKED_FOR_EXPORT' && onExportPdf && (
+                    <button
+                        onClick={onExportPdf}
+                        disabled={isExportingPdf}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '6px 16px', borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--color-content-border)', background: 'var(--color-content-surface)',
+                            color: 'var(--color-content-text)', fontSize: 12, fontWeight: 600,
+                            cursor: isExportingPdf ? 'wait' : 'pointer',
+                            opacity: isExportingPdf ? 0.7 : 1,
+                        }}
+                    >
+                        <Download size={14} />
+                        {isExportingPdf ? 'Generating...' : 'Export PDF'}
+                    </button>
+                )}
+            </div>
+
+            {/* Title */}
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-content-text)', textAlign: 'center', marginBottom: 8 }}>
+                {matterTitle || spec?.title || 'Patent Application'}
+            </h1>
+
+            {/* Brief info */}
+            {brief && (
+                <div style={{ textAlign: 'center', marginBottom: 24, fontSize: 13, color: 'var(--color-content-text-secondary)' }}>
+                    {brief.technical_field && <div>Technical Field: {brief.technical_field}</div>}
+                </div>
+            )}
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--color-content-border)', margin: '16px 0' }} />
+
+            {/* Claims Section */}
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-content-text)', marginBottom: 12 }}>Claims</h2>
+            {claims.length > 0 ? claims.map((node: any, i: number) => (
+                <div key={node.id} style={{ marginBottom: 10 }}>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.8, color: 'var(--color-content-text-secondary)' }}>
+                        <strong>{i + 1}.</strong> {node.text}
+                    </p>
+                </div>
+            )) : (
+                <p style={{ fontSize: 13, color: 'var(--color-content-text-muted)' }}>No claims available.</p>
+            )}
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--color-content-border)', margin: '16px 0' }} />
+
+            {/* Specification Sections */}
+            {specSectionOrder.map(([key, heading]) => {
+                const paras = specSections[key];
+                if (!paras || paras.length === 0) return null;
+                return (
+                    <div key={key} style={{ marginBottom: 20 }}>
+                        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-content-text)', marginBottom: 10 }}>{heading}</h2>
+                        {paras.map(para => (
+                            <p key={para.id} style={{ margin: '0 0 8px', fontSize: 13, lineHeight: 1.8, color: 'var(--color-content-text-secondary)' }}>
+                                {para.text}
+                            </p>
+                        ))}
+                    </div>
+                );
+            })}
+
+            {/* Abstract */}
+            {specSections['abstract'] && specSections['abstract'].length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--color-content-border)', margin: '16px 0' }} />
+                    <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-content-text)', marginBottom: 10 }}>Abstract</h2>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.8, color: 'var(--color-content-text-secondary)' }}>
+                        {specSections['abstract'].map(p => p.text).join(' ')}
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ---- Brief View ----
 function BriefView({ matterId, briefVersion, onUploadSuccess, onApprove, isApproving }: {
     matterId: string;
@@ -487,7 +936,9 @@ export default function ArtifactPreview({
     riskVersion, onGenerateRisk, isGeneratingRisk, onCommitRisk, isCommittingRisk, onReEvaluateRisk, isReEvaluatingRisk, claimsApproved,
     specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpec, isCommittingSpec, riskApproved,
     qaVersion, onRunQA, isRunningQA, onCommitQA, isCommittingQA, specApproved,
-    matterStatus, onLockForExport, isLocking, onExportDocx, isExporting,
+    matterStatus, onLockForExport, isLocking, onExportDocx, isExporting, onExportPdf, isExportingPdf,
+    isClaimsEditable, claimVersionId, onEditClaim, onAddClaim, onDeleteClaim,
+    isSpecEditable, specVersionId, onEditSpecParagraph, onAddSpecParagraph, onDeleteSpecParagraph,
 }: ArtifactPreviewProps) {
     return (
         <div style={{
@@ -570,6 +1021,10 @@ export default function ArtifactPreview({
                         isGenerating={isGeneratingClaims}
                         briefApproved={briefApproved}
                         highlightedClaimId={highlightedClaimId}
+                        isEditable={isClaimsEditable}
+                        onEditClaim={onEditClaim}
+                        onAddClaim={onAddClaim}
+                        onDeleteClaim={onDeleteClaim}
                     />
                 )}
                 {activeTab === 'risk' && (
@@ -595,6 +1050,10 @@ export default function ArtifactPreview({
                         isCommittingSpec={isCommittingSpec}
                         riskApproved={riskApproved}
                         onAddToChat={onAddToChat}
+                        isEditable={isSpecEditable}
+                        onEditParagraph={onEditSpecParagraph}
+                        onAddParagraph={onAddSpecParagraph}
+                        onDeleteParagraph={onDeleteSpecParagraph}
                     />
                 )}
                 {activeTab === 'qa' && (
@@ -610,6 +1069,18 @@ export default function ArtifactPreview({
                         isLocking={isLocking}
                         onExportDocx={onExportDocx}
                         isExporting={isExporting}
+                    />
+                )}
+                {activeTab === 'draft' && (
+                    <DraftPreview
+                        briefVersion={briefVersion}
+                        claimVersion={claimVersion}
+                        specVersion={specVersion}
+                        matterStatus={matterStatus}
+                        onExportDocx={onExportDocx}
+                        isExporting={isExporting}
+                        onExportPdf={onExportPdf}
+                        isExportingPdf={isExportingPdf}
                     />
                 )}
                 {activeTab === 'wrapper' && <FileWrapperViewer documents={fileWrapperDocs} onNavigate={(tab) => onTabChange(tab as ArtifactTab)} />}

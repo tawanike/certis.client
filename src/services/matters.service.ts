@@ -126,4 +126,44 @@ export const mattersService = {
     async commitSpec(matterId: string, versionId: string): Promise<SpecVersion> {
         return api.post<SpecVersion>(`/matters/${matterId}/specifications/${versionId}/commit`);
     },
+
+    // Claims editing
+    async editClaim(matterId: string, versionId: string, nodeId: string, patch: { text?: string; type?: string; category?: string; dependencies?: string[] }): Promise<ClaimGraphVersion> {
+        return api.patch<ClaimGraphVersion>(`/matters/${matterId}/claims/${versionId}/nodes/${nodeId}`, patch);
+    },
+
+    async addClaim(matterId: string, versionId: string, body: { type: string; text: string; category?: string; dependencies?: string[] }): Promise<ClaimGraphVersion> {
+        return api.post<ClaimGraphVersion>(`/matters/${matterId}/claims/${versionId}/nodes`, body);
+    },
+
+    async deleteClaim(matterId: string, versionId: string, nodeId: string): Promise<ClaimGraphVersion> {
+        return api.delete<ClaimGraphVersion>(`/matters/${matterId}/claims/${versionId}/nodes/${nodeId}`);
+    },
+
+    // Spec editing
+    async editSpecParagraph(matterId: string, versionId: string, paragraphId: string, patch: { text?: string; section?: string; claim_references?: string[] }): Promise<SpecVersion> {
+        return api.patch<SpecVersion>(`/matters/${matterId}/specifications/${versionId}/paragraphs/${paragraphId}`, patch);
+    },
+
+    async addSpecParagraph(matterId: string, versionId: string, body: { section: string; text: string; claim_references?: string[]; after_paragraph_id?: string }): Promise<SpecVersion> {
+        return api.post<SpecVersion>(`/matters/${matterId}/specifications/${versionId}/paragraphs`, body);
+    },
+
+    async deleteSpecParagraph(matterId: string, versionId: string, paragraphId: string): Promise<SpecVersion> {
+        return api.delete<SpecVersion>(`/matters/${matterId}/specifications/${versionId}/paragraphs/${paragraphId}`);
+    },
+
+    // PDF export
+    async exportPdf(matterId: string): Promise<Blob> {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/v1";
+        const { useAuthStore } = await import("@/stores/authStore");
+        const token = useAuthStore.getState().token;
+        const response = await fetch(`${baseUrl}/matters/${matterId}/export/pdf`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!response.ok) {
+            throw new Error(`Export failed: ${response.statusText}`);
+        }
+        return response.blob();
+    },
 };
