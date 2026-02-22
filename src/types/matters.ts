@@ -129,6 +129,57 @@ export interface QAReportVersion {
     spec_version_id?: string;
 }
 
+export interface RiskFinding {
+    id: string;
+    claim_id?: string;
+    category: string;
+    severity: 'high' | 'medium' | 'low';
+    title: string;
+    description: string;
+    recommendation: string;
+}
+
+export interface RiskAnalysis {
+    defensibility_score: number;
+    findings: RiskFinding[];
+    summary: string;
+}
+
+export interface RiskAnalysisVersion {
+    id: string;
+    matter_id: string;
+    version_number: number;
+    is_authoritative: boolean;
+    created_at: string;
+    analysis_data: RiskAnalysis;
+    claim_version_id?: string;
+    spec_version_id?: string;
+}
+
+export interface SpecParagraph {
+    id: string;
+    section: 'technical_field' | 'background' | 'summary' | 'detailed_description' | 'definitions' | 'figure_descriptions' | 'abstract';
+    text: string;
+    claim_references: string[];
+}
+
+export interface SpecDocument {
+    title: string;
+    sections: SpecParagraph[];
+    claim_coverage: Record<string, string[]>;
+}
+
+export interface SpecVersion {
+    id: string;
+    matter_id: string;
+    version_number: number;
+    is_authoritative: boolean;
+    created_at: string;
+    content_data: SpecDocument;
+    claim_version_id?: string;
+    risk_version_id?: string;
+}
+
 export interface AuditEvent {
     id: string;
     matter_id: string;

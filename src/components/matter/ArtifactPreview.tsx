@@ -17,8 +17,8 @@ import BriefUpload from '@/components/BriefUpload';
 import BriefViewer from '@/components/BriefViewer';
 import HoverableText from '@/components/HoverableText';
 import FileWrapperViewer from './FileWrapperViewer';
-import { type Claim, claimTree as defaultClaims, specSections } from '@/data/mockData';
-import { DocumentResponse, BriefVersion, ClaimGraphVersion, QAReportVersion } from '@/types';
+import { type Claim, claimTree as defaultClaims } from '@/data/mockData';
+import { DocumentResponse, BriefVersion, ClaimGraphVersion, QAReportVersion, RiskAnalysisVersion, SpecVersion } from '@/types';
 
 type ArtifactTab = 'brief' | 'claims' | 'risk' | 'spec' | 'qa' | 'wrapper';
 
@@ -42,6 +42,20 @@ interface ArtifactPreviewProps {
     isCommittingClaims?: boolean;
     briefApproved?: boolean;
     highlightedClaimId?: number | null;
+    // Risk flow
+    riskVersion?: RiskAnalysisVersion | null;
+    onGenerateRisk?: () => void;
+    isGeneratingRisk?: boolean;
+    onCommitRisk?: () => void;
+    isCommittingRisk?: boolean;
+    claimsApproved?: boolean;
+    // Spec flow
+    specVersion?: SpecVersion | null;
+    onGenerateSpec?: () => void;
+    isGeneratingSpec?: boolean;
+    onCommitSpec?: () => void;
+    isCommittingSpec?: boolean;
+    riskApproved?: boolean;
     // QA flow
     qaVersion?: QAReportVersion | null;
     onRunQA?: () => void;
@@ -67,21 +81,95 @@ const TABS: { id: ArtifactTab; label: string; icon: React.ElementType }[] = [
 ];
 
 // ---- Spec Viewer ----
-function SpecViewer({ onAddToChat }: { onAddToChat?: (text: string) => void }) {
-    const sections = [
-        { title: 'Background', content: specSections.background },
-        { title: 'Summary', content: specSections.summary },
-        { title: 'Detailed Description', content: specSections.detailedDescription },
-        { title: 'Abstract', content: specSections.abstract },
-    ];
+const SECTION_LABELS: Record<string, string> = {
+    technical_field: 'Technical Field',
+    background: 'Background',
+    summary: 'Summary',
+    detailed_description: 'Detailed Description',
+    definitions: 'Definitions',
+    figure_descriptions: 'Figure Descriptions',
+    abstract: 'Abstract',
+};
+
+function SpecViewer({ specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpec, isCommittingSpec, riskApproved, onAddToChat }: {
+    specVersion?: SpecVersion | null;
+    onGenerateSpec?: () => void;
+    isGeneratingSpec?: boolean;
+    onCommitSpec?: () => void;
+    isCommittingSpec?: boolean;
+    riskApproved?: boolean;
+    onAddToChat?: (text: string) => void;
+}) {
+    // Empty state
+    if (!specVersion) {
+        return (
+            <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                height: '100%', padding: 40, gap: 16,
+            }}>
+                <BookOpen size={32} style={{ color: 'var(--color-content-text-muted)' }} />
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-content-text-secondary)', textAlign: 'center' }}>
+                    No specification yet.
+                    {!riskApproved && <><br />Risk analysis must be approved before generating the specification.</>}
+                </p>
+                {riskApproved && onGenerateSpec && (
+                    <button
+                        onClick={onGenerateSpec}
+                        disabled={isGeneratingSpec}
+                        style={{
+                            padding: '8px 20px', borderRadius: 'var(--radius-sm)',
+                            border: 'none', background: 'var(--color-accent-500)',
+                            color: 'white', fontSize: 13, fontWeight: 600,
+                            cursor: isGeneratingSpec ? 'wait' : 'pointer',
+                            opacity: isGeneratingSpec ? 0.7 : 1,
+                        }}
+                    >
+                        {isGeneratingSpec ? 'Generating Specification...' : 'Generate Specification'}
+                    </button>
+                )}
+            </div>
+        );
+    }
+
+    const doc = specVersion.content_data;
+
+    // Group paragraphs by section
+    const groupedSections = doc.sections.reduce<Record<string, typeof doc.sections>>((acc, para) => {
+        if (!acc[para.section]) acc[para.section] = [];
+        acc[para.section].push(para);
+        return acc;
+    }, {});
+
+    const sectionOrder = ['technical_field', 'background', 'summary', 'detailed_description', 'definitions', 'figure_descriptions', 'abstract'];
+    const orderedKeys = sectionOrder.filter(k => groupedSections[k]);
+
     return (
         <div style={{ padding: 28, maxWidth: 800 }}>
+            {/* Header */}
             <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <BookOpen size={18} style={{ color: 'var(--color-accent-500)' }} />
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--color-content-text)' }}>Generated Specification</h3>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--color-content-text)' }}>
+                    {doc.title || 'Generated Specification'}
+                </h3>
+                {!specVersion.is_authoritative && riskApproved && onGenerateSpec && (
+                    <button
+                        onClick={onGenerateSpec}
+                        disabled={isGeneratingSpec}
+                        style={{
+                            marginLeft: 'auto', padding: '4px 12px', borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--color-content-border)', background: 'var(--color-content-surface)',
+                            color: 'var(--color-content-text)', fontSize: 12, fontWeight: 500,
+                            cursor: isGeneratingSpec ? 'wait' : 'pointer',
+                        }}
+                    >
+                        {isGeneratingSpec ? 'Re-generating...' : 'Re-generate'}
+                    </button>
+                )}
             </div>
-            {sections.map((section, i) => (
-                <div key={i} style={{ marginBottom: 24 }}>
+
+            {/* Sections */}
+            {orderedKeys.map((sectionKey) => (
+                <div key={sectionKey} style={{ marginBottom: 24 }}>
                     <h4 style={{
                         fontSize: 12, fontWeight: 700, color: 'var(--color-content-text)',
                         textTransform: 'uppercase', letterSpacing: '0.04em',
@@ -89,19 +177,62 @@ function SpecViewer({ onAddToChat }: { onAddToChat?: (text: string) => void }) {
                         paddingBottom: 6,
                         borderBottom: '1px solid var(--color-content-border)',
                     }}>
-                        {section.title}
+                        {SECTION_LABELS[sectionKey] || sectionKey}
                     </h4>
-                    <HoverableText text={section.content} onAddToChat={onAddToChat}>
-                        <p style={{
-                            margin: 0, fontSize: 13, lineHeight: 1.8,
-                            color: 'var(--color-content-text-secondary)',
-                            whiteSpace: 'pre-wrap',
-                        }}>
-                            {section.content}
-                        </p>
-                    </HoverableText>
+                    {groupedSections[sectionKey].map((para) => (
+                        <div key={para.id} style={{ marginBottom: 12 }}>
+                            <HoverableText text={para.text} onAddToChat={onAddToChat}>
+                                <p style={{
+                                    margin: 0, fontSize: 13, lineHeight: 1.8,
+                                    color: 'var(--color-content-text-secondary)',
+                                    whiteSpace: 'pre-wrap',
+                                }}>
+                                    {para.text}
+                                </p>
+                            </HoverableText>
+                            {para.claim_references.length > 0 && (
+                                <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                                    {para.claim_references.map((ref, i) => (
+                                        <span key={i} style={{
+                                            fontSize: 10, fontWeight: 600,
+                                            padding: '2px 6px', borderRadius: 'var(--radius-sm)',
+                                            background: 'var(--color-accent-50)', color: 'var(--color-accent-700)',
+                                        }}>
+                                            Claim {ref}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </div>
             ))}
+
+            {/* Commit / Approved */}
+            {!specVersion.is_authoritative && onCommitSpec && (
+                <button
+                    onClick={onCommitSpec}
+                    disabled={isCommittingSpec}
+                    style={{
+                        padding: '8px 20px', borderRadius: 'var(--radius-sm)',
+                        border: 'none', background: 'var(--color-accent-500)',
+                        color: 'white', fontSize: 13, fontWeight: 600,
+                        cursor: isCommittingSpec ? 'wait' : 'pointer',
+                        opacity: isCommittingSpec ? 0.7 : 1,
+                    }}
+                >
+                    {isCommittingSpec ? 'Committing...' : 'Approve Specification'}
+                </button>
+            )}
+            {specVersion.is_authoritative && (
+                <div style={{
+                    padding: '8px 16px', borderRadius: 'var(--radius-sm)',
+                    background: 'var(--color-accent-50)', color: 'var(--color-accent-700)',
+                    fontSize: 13, fontWeight: 600, display: 'inline-block',
+                }}>
+                    Specification Approved
+                </div>
+            )}
         </div>
     );
 }
@@ -352,6 +483,8 @@ export default function ArtifactPreview({
     matterId, briefVersion, onBriefUploadSuccess, onApproveBrief, isApprovingBrief,
     claimVersion, onGenerateClaims, isGeneratingClaims, onCommitClaims, isCommittingClaims, briefApproved,
     highlightedClaimId,
+    riskVersion, onGenerateRisk, isGeneratingRisk, onCommitRisk, isCommittingRisk, claimsApproved,
+    specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpec, isCommittingSpec, riskApproved,
     qaVersion, onRunQA, isRunningQA, onCommitQA, isCommittingQA, specApproved,
     matterStatus, onLockForExport, isLocking, onExportDocx, isExporting,
 }: ArtifactPreviewProps) {
@@ -438,8 +571,28 @@ export default function ArtifactPreview({
                         highlightedClaimId={highlightedClaimId}
                     />
                 )}
-                {activeTab === 'risk' && <RiskDashboard onAddToChat={onAddToChat} />}
-                {activeTab === 'spec' && <SpecViewer onAddToChat={onAddToChat} />}
+                {activeTab === 'risk' && (
+                    <RiskDashboard
+                        riskVersion={riskVersion}
+                        onGenerateRisk={onGenerateRisk}
+                        isGeneratingRisk={isGeneratingRisk}
+                        onCommitRisk={onCommitRisk}
+                        isCommittingRisk={isCommittingRisk}
+                        claimsApproved={claimsApproved}
+                        onAddToChat={onAddToChat}
+                    />
+                )}
+                {activeTab === 'spec' && (
+                    <SpecViewer
+                        specVersion={specVersion}
+                        onGenerateSpec={onGenerateSpec}
+                        isGeneratingSpec={isGeneratingSpec}
+                        onCommitSpec={onCommitSpec}
+                        isCommittingSpec={isCommittingSpec}
+                        riskApproved={riskApproved}
+                        onAddToChat={onAddToChat}
+                    />
+                )}
                 {activeTab === 'qa' && (
                     <QAViewer
                         qaVersion={qaVersion}

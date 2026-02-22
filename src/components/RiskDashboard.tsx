@@ -1,22 +1,9 @@
 'use client';
 
 import React from 'react';
+import { Shield } from 'lucide-react';
 import HoverableText from './HoverableText';
-
-const risks = [
-    {
-        category: 'FUNCTIONAL',
-        claim: 'Claim 1',
-        description: '"Degradation metric" lacks specific parameters — could face an indefiniteness rejection.',
-        severity: 'medium',
-    },
-    {
-        category: 'PRIOR ART',
-        claim: 'Claim 3',
-        description: 'Overlap with US2023/0145782 — consider narrowing the environmental monitoring limitation.',
-        severity: 'low',
-    },
-];
+import { RiskAnalysisVersion } from '@/types';
 
 function ScoreCircle({ score }: { score: number }) {
     const radius = 44;
@@ -61,59 +48,139 @@ function ScoreCircle({ score }: { score: number }) {
     );
 }
 
-export default function RiskDashboard({ onAddToChat }: { onAddToChat?: (text: string) => void }) {
+interface RiskDashboardProps {
+    riskVersion?: RiskAnalysisVersion | null;
+    onGenerateRisk?: () => void;
+    isGeneratingRisk?: boolean;
+    onCommitRisk?: () => void;
+    isCommittingRisk?: boolean;
+    claimsApproved?: boolean;
+    onAddToChat?: (text: string) => void;
+}
+
+export default function RiskDashboard({
+    riskVersion, onGenerateRisk, isGeneratingRisk, onCommitRisk, isCommittingRisk,
+    claimsApproved, onAddToChat,
+}: RiskDashboardProps) {
+    // Empty state
+    if (!riskVersion) {
+        return (
+            <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                height: '100%', padding: 40, gap: 16,
+            }}>
+                <Shield size={32} style={{ color: 'var(--color-content-text-muted)' }} />
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-content-text-secondary)', textAlign: 'center' }}>
+                    No risk analysis yet.
+                    {!claimsApproved && <><br />Claims must be approved before running risk analysis.</>}
+                </p>
+                {claimsApproved && onGenerateRisk && (
+                    <button
+                        onClick={onGenerateRisk}
+                        disabled={isGeneratingRisk}
+                        style={{
+                            padding: '8px 20px', borderRadius: 'var(--radius-sm)',
+                            border: 'none', background: 'var(--color-accent-500)',
+                            color: 'white', fontSize: 13, fontWeight: 600,
+                            cursor: isGeneratingRisk ? 'wait' : 'pointer',
+                            opacity: isGeneratingRisk ? 0.7 : 1,
+                        }}
+                    >
+                        {isGeneratingRisk ? 'Running Risk Analysis...' : 'Run Risk Analysis'}
+                    </button>
+                )}
+            </div>
+        );
+    }
+
+    const analysis = riskVersion.analysis_data;
+    const severityBadge = (severity: string) => {
+        const map: Record<string, string> = { high: 'badge-danger', medium: 'badge-warning', low: 'badge-info' };
+        const label: Record<string, string> = { high: 'HIGH', medium: 'MEDIUM', low: 'LOW' };
+        return <span className={`badge ${map[severity] || 'badge-info'}`}>{label[severity] || severity.toUpperCase()}</span>;
+    };
+
     return (
         <div className="p-4">
+            {/* Header */}
+            <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Shield size={18} style={{ color: 'var(--color-accent-500)' }} />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--color-content-text)' }}>Risk Analysis</h3>
+                {!riskVersion.is_authoritative && claimsApproved && onGenerateRisk && (
+                    <button
+                        onClick={onGenerateRisk}
+                        disabled={isGeneratingRisk}
+                        style={{
+                            marginLeft: 'auto', padding: '4px 12px', borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--color-content-border)', background: 'var(--color-content-surface)',
+                            color: 'var(--color-content-text)', fontSize: 12, fontWeight: 500,
+                            cursor: isGeneratingRisk ? 'wait' : 'pointer',
+                        }}
+                    >
+                        {isGeneratingRisk ? 'Re-running...' : 'Re-run Analysis'}
+                    </button>
+                )}
+            </div>
+
             {/* Score */}
             <div className="flex flex-col items-center mb-6 pb-6 border-b border-[var(--color-content-border)]">
-                <ScoreCircle score={82} />
+                <ScoreCircle score={analysis.defensibility_score} />
                 <p className="mt-3 text-[11px] text-[var(--color-content-text-muted)] text-center">
-                    Outperforms <strong className="text-[var(--color-content-text-secondary)]">85%</strong> of similar portfolios
+                    Defensibility Score
                 </p>
             </div>
 
             {/* Detected Risks Header */}
             <div className="flex items-center justify-between mb-3">
                 <span className="text-[11px] font-bold text-[var(--color-content-text)] uppercase tracking-wider">
-                    Detected Risks
+                    Detected Risks ({analysis.findings.length})
                 </span>
-                <button className="text-[11px] font-medium text-[var(--color-blue-500)] hover:underline cursor-pointer bg-transparent border-none p-0">
-                    Filter by Severity
-                </button>
             </div>
 
             {/* Risk Cards */}
             <div className="space-y-2">
-                {risks.map((risk, idx) => (
+                {analysis.findings.map((finding) => (
                     <div
-                        key={idx}
+                        key={finding.id}
                         className="p-3.5 bg-[var(--color-content-surface)] border border-[var(--color-content-border)] rounded-[var(--radius-sm)] transition-shadow hover:shadow-sm"
                     >
                         <div className="flex items-center gap-2 mb-2">
                             <span className="text-[10px] font-bold text-[var(--color-content-text-muted)] uppercase tracking-wider">
-                                {risk.category}
+                                {finding.category}
                             </span>
-                            <span className="text-[10px] text-[var(--color-content-text-muted)]">·</span>
-                            <span className="text-[10px] font-medium text-[var(--color-content-text-muted)]">
-                                {risk.claim}
-                            </span>
-                            <span className={`ml-auto badge ${risk.severity === 'medium' ? 'badge-warning' : 'badge-info'}`}>
-                                {risk.severity === 'medium' ? 'MEDIUM PRIORITY' : 'LOW PRIORITY'}
+                            {finding.claim_id && (
+                                <>
+                                    <span className="text-[10px] text-[var(--color-content-text-muted)]">·</span>
+                                    <span className="text-[10px] font-medium text-[var(--color-content-text-muted)]">
+                                        Claim {finding.claim_id}
+                                    </span>
+                                </>
+                            )}
+                            <span className="ml-auto">
+                                {severityBadge(finding.severity)}
                             </span>
                         </div>
-                        <HoverableText text={risk.description} onAddToChat={onAddToChat}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-content-text)', marginBottom: 2 }}>
+                            {finding.title}
+                        </div>
+                        <HoverableText text={finding.description} onAddToChat={onAddToChat}>
                             <p className="m-0 text-[12px] leading-relaxed text-[var(--color-content-text-secondary)]">
-                                {risk.description}
+                                {finding.description}
                             </p>
                         </HoverableText>
+                        {finding.recommendation && (
+                            <div style={{ fontSize: 12, color: 'var(--color-accent-600)', marginTop: 4, fontStyle: 'italic' }}>
+                                {finding.recommendation}
+                            </div>
+                        )}
 
                         <div className="mt-3 flex justify-end">
                             <button
-                                onClick={() => onAddToChat?.(`Discuss the ${risk.severity} risk in ${risk.claim}: ${risk.description}`)}
+                                onClick={() => onAddToChat?.(`Discuss the ${finding.severity} risk "${finding.title}": ${finding.description}`)}
                                 className="
-                                    text-[11px] font-medium text-[var(--color-accent-600)] 
-                                    bg-[var(--color-accent-100)] hover:bg-[var(--color-accent-200)] 
-                                    px-3 py-1.5 rounded-[var(--radius-sm)] 
+                                    text-[11px] font-medium text-[var(--color-accent-600)]
+                                    bg-[var(--color-accent-100)] hover:bg-[var(--color-accent-200)]
+                                    px-3 py-1.5 rounded-[var(--radius-sm)]
                                     transition-colors flex items-center gap-1.5
                                 "
                             >
@@ -123,6 +190,44 @@ export default function RiskDashboard({ onAddToChat }: { onAddToChat?: (text: st
                     </div>
                 ))}
             </div>
+
+            {/* Summary */}
+            {analysis.summary && (
+                <div style={{
+                    padding: '12px 16px', borderRadius: 'var(--radius-sm)', marginTop: 16, marginBottom: 16,
+                    background: 'var(--color-content-surface)',
+                    border: '1px solid var(--color-content-border)',
+                }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-content-text)', marginBottom: 4 }}>Summary</div>
+                    <div style={{ fontSize: 13, color: 'var(--color-content-text-secondary)', lineHeight: 1.6 }}>{analysis.summary}</div>
+                </div>
+            )}
+
+            {/* Commit / Approved */}
+            {!riskVersion.is_authoritative && onCommitRisk && (
+                <button
+                    onClick={onCommitRisk}
+                    disabled={isCommittingRisk}
+                    style={{
+                        padding: '8px 20px', borderRadius: 'var(--radius-sm)',
+                        border: 'none', background: 'var(--color-accent-500)',
+                        color: 'white', fontSize: 13, fontWeight: 600,
+                        cursor: isCommittingRisk ? 'wait' : 'pointer',
+                        opacity: isCommittingRisk ? 0.7 : 1,
+                    }}
+                >
+                    {isCommittingRisk ? 'Committing...' : 'Approve Risk Analysis'}
+                </button>
+            )}
+            {riskVersion.is_authoritative && (
+                <div style={{
+                    padding: '8px 16px', borderRadius: 'var(--radius-sm)',
+                    background: 'var(--color-accent-50)', color: 'var(--color-accent-700)',
+                    fontSize: 13, fontWeight: 600, display: 'inline-block',
+                }}>
+                    Risk Analysis Approved
+                </div>
+            )}
         </div>
     );
 }

@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import { BriefUploadResponse, BriefVersion, ClaimGraphVersion, Matter, MatterCreatePayload, DocumentResponse, SuggestionsResponse, QAReport, QAReportVersion, AuditEvent } from "@/types";
+import { BriefUploadResponse, BriefVersion, ClaimGraphVersion, Matter, MatterCreatePayload, DocumentResponse, SuggestionsResponse, QAReport, QAReportVersion, AuditEvent, RiskAnalysisVersion, SpecVersion } from "@/types";
 
 export const mattersService = {
     async uploadBrief(matterId: string, file: File): Promise<BriefUploadResponse> {
@@ -90,5 +90,34 @@ export const mattersService = {
 
     async listAuditEvents(matterId: string): Promise<AuditEvent[]> {
         return api.get<AuditEvent[]>(`/matters/${matterId}/audit`);
+    },
+
+    async generateRiskAnalysis(matterId: string, claimVersionId?: string): Promise<RiskAnalysisVersion> {
+        const body: Record<string, string> = {};
+        if (claimVersionId) body.claim_version_id = claimVersionId;
+        return api.post<RiskAnalysisVersion>(`/matters/${matterId}/risk/analyze`, body);
+    },
+
+    async listRiskVersions(matterId: string): Promise<RiskAnalysisVersion[]> {
+        return api.get<RiskAnalysisVersion[]>(`/matters/${matterId}/risk/versions`);
+    },
+
+    async commitRisk(matterId: string, versionId: string): Promise<RiskAnalysisVersion> {
+        return api.post<RiskAnalysisVersion>(`/matters/${matterId}/risk/${versionId}/commit`);
+    },
+
+    async generateSpecification(matterId: string, claimVersionId?: string, riskVersionId?: string): Promise<SpecVersion> {
+        const body: Record<string, string> = {};
+        if (claimVersionId) body.claim_version_id = claimVersionId;
+        if (riskVersionId) body.risk_version_id = riskVersionId;
+        return api.post<SpecVersion>(`/matters/${matterId}/specifications/generate`, body);
+    },
+
+    async listSpecVersions(matterId: string): Promise<SpecVersion[]> {
+        return api.get<SpecVersion[]>(`/matters/${matterId}/specifications/versions`);
+    },
+
+    async commitSpec(matterId: string, versionId: string): Promise<SpecVersion> {
+        return api.post<SpecVersion>(`/matters/${matterId}/specifications/${versionId}/commit`);
     },
 };
