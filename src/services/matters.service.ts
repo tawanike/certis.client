@@ -67,8 +67,13 @@ export const mattersService = {
         return api.get<QAReportVersion[]>(`/matters/${matterId}/qa/versions`);
     },
 
-    async commitQA(matterId: string, versionId: string): Promise<QAReportVersion> {
-        return api.post<QAReportVersion>(`/matters/${matterId}/qa/${versionId}/commit`);
+    async commitQA(matterId: string, versionId: string, forceOverride?: boolean, overrideReason?: string): Promise<QAReportVersion> {
+        const body: Record<string, any> = {};
+        if (forceOverride) {
+            body.force_override = true;
+            body.override_reason = overrideReason || '';
+        }
+        return api.post<QAReportVersion>(`/matters/${matterId}/qa/${versionId}/commit`, body);
     },
 
     async lockMatter(matterId: string): Promise<Matter> {

@@ -363,6 +363,22 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
         }
     }, [DEMO_MATTER_ID, qaVersion, refreshQA, refreshMatter, refreshSuggestions]);
 
+    // QA override handler — attorney force-approves despite blocking errors
+    const handleOverrideQA = useCallback(async (reason: string) => {
+        if (!qaVersion) return;
+        setIsCommittingQA(true);
+        try {
+            await mattersService.commitQA(DEMO_MATTER_ID, qaVersion.id, true, reason);
+            await refreshQA();
+            await refreshMatter();
+            refreshSuggestions();
+        } catch (err) {
+            console.error("Failed to override QA", err);
+        } finally {
+            setIsCommittingQA(false);
+        }
+    }, [DEMO_MATTER_ID, qaVersion, refreshQA, refreshMatter, refreshSuggestions]);
+
     // Lock for export handler
     const handleLockForExport = useCallback(async () => {
         setIsLocking(true);
@@ -679,6 +695,7 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
                 isRunningQA={isRunningQA}
                 onCommitQA={handleCommitQA}
                 isCommittingQA={isCommittingQA}
+                onOverrideQA={handleOverrideQA}
                 specApproved={specApproved}
                 matterStatus={matter?.status}
                 onLockForExport={handleLockForExport}

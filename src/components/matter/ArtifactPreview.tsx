@@ -71,6 +71,7 @@ interface ArtifactPreviewProps {
     isRunningQA?: boolean;
     onCommitQA?: () => void;
     isCommittingQA?: boolean;
+    onOverrideQA?: (reason: string) => Promise<void>;
     specApproved?: boolean;
     // Lock & Export flow
     matterStatus?: string;
@@ -501,12 +502,104 @@ function SpecViewer({ specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpe
 }
 
 // ---- QA Viewer ----
-function QAViewer({ qaVersion, onRunQA, isRunningQA, onCommitQA, isCommittingQA, specApproved, matterStatus, onLockForExport, isLocking, onExportDocx, isExporting }: {
+function AttorneyOverridePanel({ onOverride, isCommitting }: { onOverride: (reason: string) => Promise<void>; isCommitting?: boolean }) {
+    const [expanded, setExpanded] = useState(false);
+    const [reason, setReason] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleSubmit = async () => {
+        if (!reason.trim()) return;
+        setSubmitting(true);
+        try {
+            await onOverride(reason.trim());
+        } finally {
+            setSubmitting(false);
+            setExpanded(false);
+            setReason('');
+        }
+    };
+
+    if (!expanded) {
+        return (
+            <button
+                onClick={() => setExpanded(true)}
+                disabled={isCommitting}
+                style={{
+                    marginTop: 8, padding: '6px 16px', borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-danger)', background: 'transparent',
+                    color: 'var(--color-danger)', fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', width: 'fit-content',
+                }}
+            >
+                Attorney Override — Bypass Errors
+            </button>
+        );
+    }
+
+    return (
+        <div style={{
+            marginTop: 8, padding: 16, borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--color-danger)',
+            background: 'var(--color-danger-bg, #fef2f2)',
+        }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-danger)', marginBottom: 8 }}>
+                <AlertCircle size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }} />
+                Attorney Override
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--color-content-text-secondary)', margin: '0 0 8px', lineHeight: 1.5 }}>
+                This will approve the QA report despite {' '}
+                blocking errors. A reason is required for the audit trail.
+            </p>
+            <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Reason for overriding QA errors (required)..."
+                rows={3}
+                style={{
+                    width: '100%', padding: '8px 10px', borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-content-border)',
+                    background: 'var(--color-content-surface)',
+                    color: 'var(--color-content-text)',
+                    fontSize: 13, fontFamily: 'inherit', resize: 'vertical',
+                }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button
+                    onClick={handleSubmit}
+                    disabled={!reason.trim() || submitting}
+                    style={{
+                        padding: '6px 16px', borderRadius: 'var(--radius-sm)',
+                        border: 'none', background: 'var(--color-danger)',
+                        color: 'white', fontSize: 12, fontWeight: 600,
+                        cursor: (!reason.trim() || submitting) ? 'not-allowed' : 'pointer',
+                        opacity: (!reason.trim() || submitting) ? 0.6 : 1,
+                    }}
+                >
+                    {submitting ? 'Overriding...' : 'Override & Approve'}
+                </button>
+                <button
+                    onClick={() => { setExpanded(false); setReason(''); }}
+                    style={{
+                        padding: '6px 16px', borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--color-content-border)', background: 'var(--color-content-surface)',
+                        color: 'var(--color-content-text)', fontSize: 12, fontWeight: 500,
+                        cursor: 'pointer',
+                    }}
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function QAViewer({ qaVersion, onRunQA, isRunningQA, onCommitQA, isCommittingQA, onOverrideQA, specApproved, matterStatus, onLockForExport, isLocking, onExportDocx, isExporting }: {
     qaVersion?: QAReportVersion | null;
     onRunQA?: () => void;
     isRunningQA?: boolean;
     onCommitQA?: () => void;
     isCommittingQA?: boolean;
+    onOverrideQA?: (reason: string) => Promise<void>;
     specApproved?: boolean;
     matterStatus?: string;
     onLockForExport?: () => void;
@@ -697,6 +790,11 @@ function QAViewer({ qaVersion, onRunQA, isRunningQA, onCommitQA, isCommittingQA,
                 >
                     {isCommittingQA ? 'Committing...' : !report.can_export ? 'Blocking Errors — Cannot Commit' : 'Approve QA Results'}
                 </button>
+            )}
+
+            {/* Attorney Override — shown when there are blocking errors */}
+            {!qaVersion.is_authoritative && !report.can_export && onOverrideQA && (
+                <AttorneyOverridePanel onOverride={onOverrideQA} isCommitting={isCommittingQA} />
             )}
             {qaVersion.is_authoritative && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -935,7 +1033,7 @@ export default function ArtifactPreview({
     highlightedClaimId,
     riskVersion, onGenerateRisk, isGeneratingRisk, onCommitRisk, isCommittingRisk, onReEvaluateRisk, isReEvaluatingRisk, claimsApproved,
     specVersion, onGenerateSpec, isGeneratingSpec, onCommitSpec, isCommittingSpec, riskApproved,
-    qaVersion, onRunQA, isRunningQA, onCommitQA, isCommittingQA, specApproved,
+    qaVersion, onRunQA, isRunningQA, onCommitQA, isCommittingQA, onOverrideQA, specApproved,
     matterStatus, onLockForExport, isLocking, onExportDocx, isExporting, onExportPdf, isExportingPdf,
     isClaimsEditable, claimVersionId, onEditClaim, onAddClaim, onDeleteClaim,
     isSpecEditable, specVersionId, onEditSpecParagraph, onAddSpecParagraph, onDeleteSpecParagraph,
@@ -1063,6 +1161,7 @@ export default function ArtifactPreview({
                         isRunningQA={isRunningQA}
                         onCommitQA={onCommitQA}
                         isCommittingQA={isCommittingQA}
+                        onOverrideQA={onOverrideQA}
                         specApproved={specApproved}
                         matterStatus={matterStatus}
                         onLockForExport={onLockForExport}
