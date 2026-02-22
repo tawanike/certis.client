@@ -35,6 +35,7 @@ const STATUS_TO_STAGE_INDEX: Record<MatterStatus, number> = {
     CLAIMS_APPROVED: 1,
     RISK_REVIEWED: 2,
     SPEC_GENERATED: 3,
+    RISK_RE_REVIEWED: 3,
     QA_COMPLETE: 4,
     LOCKED_FOR_EXPORT: 5,
 };

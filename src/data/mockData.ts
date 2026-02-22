@@ -30,6 +30,8 @@ export interface DocumentReference {
     content: string;
     document_id?: string;
     chunk_index?: number;
+    content_type?: string;
+    total_pages?: number;
 }
 
 export interface ChatMessage {

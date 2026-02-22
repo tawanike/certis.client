@@ -12,7 +12,7 @@ import {
     mockWorkstreams,
 } from '@/data/mockData';
 import { Stage } from '@/components/ProgressTracker';
-import { Matter, BriefVersion, ClaimGraphVersion, Suggestion } from '@/types';
+import { Matter, BriefVersion, ClaimGraphVersion, Suggestion, QAReportVersion } from '@/types';
 
 type ArtifactTab = 'brief' | 'claims' | 'risk' | 'spec' | 'qa' | 'wrapper';
 
@@ -78,6 +78,11 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
     const [suggestionsLoading, setSuggestionsLoading] = useState(false);
     const [highlightedClaimId, setHighlightedClaimId] = useState<number | null>(null);
+    const [qaVersion, setQAVersion] = useState<QAReportVersion | null>(null);
+    const [isRunningQA, setIsRunningQA] = useState(false);
+    const [isCommittingQA, setIsCommittingQA] = useState(false);
+    const [isLocking, setIsLocking] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
     const DEMO_MATTER_ID = matterId;
 
@@ -132,12 +137,26 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
         }
     }, [DEMO_MATTER_ID]);
 
+    // Fetch latest QA version
+    const refreshQA = useCallback(async () => {
+        try {
+            const versions = await mattersService.listQAVersions(DEMO_MATTER_ID);
+            if (versions.length > 0) {
+                const latest = versions.reduce((a, b) => a.version_number > b.version_number ? a : b);
+                setQAVersion(latest);
+            }
+        } catch (err) {
+            console.error("Failed to fetch QA versions", err);
+        }
+    }, [DEMO_MATTER_ID]);
+
     useEffect(() => {
         refreshMatter();
         refreshBrief();
         refreshClaims();
         refreshSuggestions();
-    }, [refreshMatter, refreshBrief, refreshClaims, refreshSuggestions]);
+        refreshQA();
+    }, [refreshMatter, refreshBrief, refreshClaims, refreshSuggestions, refreshQA]);
 
     useEffect(() => {
         async function fetchDocs() {
@@ -208,13 +227,83 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
         }
     }, [DEMO_MATTER_ID, claimVersion, refreshClaims, refreshMatter, refreshSuggestions]);
 
+    // QA generation handler
+    const handleRunQA = useCallback(async () => {
+        setIsRunningQA(true);
+        try {
+            await mattersService.runQAValidation(DEMO_MATTER_ID);
+            await refreshQA();
+            await refreshMatter();
+            setActiveTab('qa');
+            refreshSuggestions();
+        } catch (err) {
+            console.error("Failed to run QA validation", err);
+        } finally {
+            setIsRunningQA(false);
+        }
+    }, [DEMO_MATTER_ID, refreshQA, refreshMatter, refreshSuggestions]);
+
+    // QA commit handler
+    const handleCommitQA = useCallback(async () => {
+        if (!qaVersion) return;
+        setIsCommittingQA(true);
+        try {
+            await mattersService.commitQA(DEMO_MATTER_ID, qaVersion.id);
+            await refreshQA();
+            await refreshMatter();
+            refreshSuggestions();
+        } catch (err) {
+            console.error("Failed to commit QA", err);
+        } finally {
+            setIsCommittingQA(false);
+        }
+    }, [DEMO_MATTER_ID, qaVersion, refreshQA, refreshMatter, refreshSuggestions]);
+
+    // Lock for export handler
+    const handleLockForExport = useCallback(async () => {
+        setIsLocking(true);
+        try {
+            await mattersService.lockMatter(DEMO_MATTER_ID);
+            await refreshMatter();
+            refreshSuggestions();
+        } catch (err) {
+            console.error("Failed to lock matter for export", err);
+        } finally {
+            setIsLocking(false);
+        }
+    }, [DEMO_MATTER_ID, refreshMatter, refreshSuggestions]);
+
+    // Export DOCX handler
+    const handleExportDocx = useCallback(async () => {
+        setIsExporting(true);
+        try {
+            const blob = await mattersService.exportDocx(DEMO_MATTER_ID);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `patent_${DEMO_MATTER_ID}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Failed to export DOCX", err);
+        } finally {
+            setIsExporting(false);
+        }
+    }, [DEMO_MATTER_ID]);
+
     const briefApproved = briefVersion?.is_authoritative === true;
+    const specApproved = matter?.status !== 'CREATED' && matter?.status !== 'BRIEF_ANALYZED' && matter?.status !== 'CLAIMS_PROPOSED' && matter?.status !== 'CLAIMS_APPROVED' && matter?.status !== 'RISK_REVIEWED';
 
     // Action map: maps action_id strings to handler functions
     const ACTION_MAP: Record<string, () => Promise<void>> = {
         approve_brief: handleApproveBrief,
         generate_claims: handleGenerateClaims,
         commit_claims: handleCommitClaims,
+        run_qa: handleRunQA,
+        commit_qa: handleCommitQA,
+        lock_for_export: handleLockForExport,
     };
 
     const handleWorkflowAction = useCallback(async (actionId: string) => {
@@ -224,7 +313,7 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
         } else {
             console.warn(`Unknown workflow action: ${actionId}`);
         }
-    }, [handleApproveBrief, handleGenerateClaims, handleCommitClaims]);
+    }, [handleApproveBrief, handleGenerateClaims, handleCommitClaims, handleRunQA, handleCommitQA, handleLockForExport]);
 
     const handleClaimNavigate = useCallback((claimId: number) => {
         setActiveTab('claims');
@@ -454,6 +543,17 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
                 isCommittingClaims={isCommittingClaims}
                 briefApproved={briefApproved}
                 highlightedClaimId={highlightedClaimId}
+                qaVersion={qaVersion}
+                onRunQA={handleRunQA}
+                isRunningQA={isRunningQA}
+                onCommitQA={handleCommitQA}
+                isCommittingQA={isCommittingQA}
+                specApproved={specApproved}
+                matterStatus={matter?.status}
+                onLockForExport={handleLockForExport}
+                isLocking={isLocking}
+                onExportDocx={handleExportDocx}
+                isExporting={isExporting}
             />
         </div>
     );

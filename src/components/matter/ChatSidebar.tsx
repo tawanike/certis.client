@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Copy, Sparkles, ArrowLeft, FileText, ChevronDown } from 'lucide-react';
+import { Send, Paperclip, Copy, Sparkles, ArrowLeft, FileText, FileSpreadsheet, FileImage, File, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { ChatMessage, DocumentReference, chatMessages as defaultMessages, Workstream, WorkstreamType } from '@/data/mockData';
 import CommitGate from '@/components/CommitGate';
@@ -126,6 +126,29 @@ function formatSystemMessage(content: string): React.ReactNode[] {
     return parts;
 }
 
+// Map content_type to a lucide icon component
+function getFileIcon(contentType?: string) {
+    if (!contentType) return FileText;
+    if (contentType.includes('pdf')) return FileText;
+    if (contentType.includes('word') || contentType.includes('document')) return File;
+    if (contentType.includes('spreadsheet') || contentType.includes('excel') || contentType.includes('csv')) return FileSpreadsheet;
+    if (contentType.includes('image')) return FileImage;
+    return FileText;
+}
+
+// Short label for the file type badge (e.g. "PDF", "DOCX")
+function getFileTypeLabel(contentType?: string): string | null {
+    if (!contentType) return null;
+    if (contentType.includes('pdf')) return 'PDF';
+    if (contentType.includes('wordprocessingml') || contentType.includes('msword')) return 'DOCX';
+    if (contentType.includes('spreadsheet') || contentType.includes('excel')) return 'XLSX';
+    if (contentType.includes('csv')) return 'CSV';
+    if (contentType.includes('image/png')) return 'PNG';
+    if (contentType.includes('image/jpeg') || contentType.includes('image/jpg')) return 'JPG';
+    if (contentType.includes('image')) return 'IMG';
+    return null;
+}
+
 // Expandable citation card for document references
 function CitationCard({ reference, msgId, idx, isExpanded, onToggle }: {
     reference: DocumentReference;
@@ -134,6 +157,9 @@ function CitationCard({ reference, msgId, idx, isExpanded, onToggle }: {
     isExpanded: boolean;
     onToggle: () => void;
 }) {
+    const IconComponent = getFileIcon(reference.content_type);
+    const typeLabel = getFileTypeLabel(reference.content_type);
+
     return (
         <div
             onClick={onToggle}
@@ -145,17 +171,32 @@ function CitationCard({ reference, msgId, idx, isExpanded, onToggle }: {
                 borderRadius: 'var(--radius-sm)',
                 color: 'var(--color-content-text-secondary)',
                 cursor: 'pointer',
-                maxWidth: isExpanded ? '100%' : 260,
+                maxWidth: isExpanded ? '100%' : 320,
                 transition: 'all 0.15s ease',
             }}
         >
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <FileText size={11} style={{ color: 'var(--color-accent-500)', flexShrink: 0 }} />
+                <IconComponent size={11} style={{ color: 'var(--color-accent-500)', flexShrink: 0 }} />
                 <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {reference.filename}
                 </span>
+                {typeLabel && (
+                    <span style={{
+                        fontSize: 8,
+                        fontWeight: 700,
+                        padding: '0 4px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'var(--color-accent-50)',
+                        color: 'var(--color-accent-600)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.03em',
+                        flexShrink: 0,
+                    }}>
+                        {typeLabel}
+                    </span>
+                )}
                 <span style={{ color: 'var(--color-content-text-muted)', fontSize: 10, flexShrink: 0 }}>
-                    p.{reference.page_number}
+                    p.{reference.page_number}{reference.total_pages ? `/${reference.total_pages}` : ''}
                     {reference.chunk_index !== undefined && ` · §${reference.chunk_index + 1}`}
                 </span>
                 <ChevronDown

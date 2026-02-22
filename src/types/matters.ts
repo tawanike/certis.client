@@ -5,6 +5,7 @@ export type MatterStatus =
     | 'CLAIMS_APPROVED'
     | 'RISK_REVIEWED'
     | 'SPEC_GENERATED'
+    | 'RISK_RE_REVIEWED'
     | 'QA_COMPLETE'
     | 'LOCKED_FOR_EXPORT';
 
@@ -93,5 +94,48 @@ export interface DocumentResponse {
     content_type: string;
     total_pages: number;
     status: 'processing' | 'ready' | 'failed';
+    created_at: string;
+}
+
+export interface QAFinding {
+    id: string;
+    category: 'antecedent_basis' | 'dependency_loop' | 'undefined_term' | 'claim_spec_consistency' | 'support_coverage';
+    severity: 'error' | 'warning';
+    claim_id?: string;
+    location: string;
+    title: string;
+    description: string;
+    recommendation: string;
+}
+
+export interface QAReport {
+    support_coverage_score: number;
+    total_errors: number;
+    total_warnings: number;
+    findings: QAFinding[];
+    summary: string;
+    can_export: boolean;
+}
+
+export interface QAReportVersion {
+    id: string;
+    matter_id: string;
+    version_number: number;
+    description?: string;
+    is_authoritative: boolean;
+    created_at: string;
+    report_data: QAReport;
+    claim_version_id?: string;
+    spec_version_id?: string;
+}
+
+export interface AuditEvent {
+    id: string;
+    matter_id: string;
+    event_type: string;
+    actor_id?: string;
+    artifact_version_id?: string;
+    artifact_type?: string;
+    detail?: Record<string, any>;
     created_at: string;
 }
