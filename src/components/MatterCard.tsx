@@ -3,8 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Globe, ChevronRight } from 'lucide-react';
-import { statusLabels } from '@/data/mockData';
-import { Matter } from '@/types';
+import { Matter, STATUS_LABELS } from '@/types';
 
 interface MatterCardProps {
     matter: Matter;
@@ -36,7 +35,7 @@ function MiniScoreRing({ score }: { score: number }) {
 }
 
 export default function MatterCard({ matter }: MatterCardProps) {
-    const statusInfo = statusLabels[matter.status as keyof typeof statusLabels] || { label: matter.status, variant: 'info' };
+    const statusInfo = STATUS_LABELS[matter.status] || { label: matter.status, variant: 'info' };
     const juris = matter.jurisdictions && matter.jurisdictions.length > 0 ? matter.jurisdictions[0] : 'USPTO';
     const score = matter.defensibility_score || 0;
     const inventorsStr = matter.inventors?.join(', ') || 'Unknown';

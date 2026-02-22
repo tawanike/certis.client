@@ -14,7 +14,7 @@ import {
     FilePlus,
     AlertTriangle,
 } from 'lucide-react';
-import { Thread, threads as allThreads } from '@/data/mockData';
+import { Thread, threads as allThreads } from '@/types';
 
 const getBadgeIcon = (badge: string) => {
     if (badge.includes('Risk') || badge.includes('Warning')) {
@@ -132,16 +132,6 @@ export default function Sidebar({
                 </div>
             </div>
 
-            {/* Workstream Context header */}
-            <div className="px-4 pt-4 pb-2">
-                <div className="text-[10px] font-bold text-[var(--color-sidebar-text-muted)] uppercase tracking-wider mb-1">
-                    Workstreams
-                </div>
-                <div className="text-[10px] text-[var(--color-sidebar-text-secondary)] italic truncate opacity-80">
-                    For: Distributed Ledger Auth Protocol
-                </div>
-            </div>
-
             {/* Dynamic Navigation Sections */}
             <nav className="flex-1 overflow-y-auto px-2 pb-2 space-y-1">
                 {sections.map(section => {
@@ -203,11 +193,11 @@ export default function Sidebar({
                 })}
             </nav>
 
-            {/* Footer / New Workstream */}
+            {/* Footer */}
             <div className="p-3 border-t border-[var(--color-sidebar-border)]">
                 <button className="w-full flex items-center gap-2 px-3 py-2 rounded text-[12px] font-medium text-[var(--color-sidebar-text-muted)] hover:text-[var(--color-sidebar-text)] hover:bg-[var(--color-sidebar-surface)] transition-all">
                     <Plus size={14} />
-                    New Workstream...
+                    New Matter...
                 </button>
                 <div className="flex items-center justify-between px-3 mt-2 text-[10px] text-[var(--color-sidebar-text-muted)]">
                     <span className="opacity-70">v1.2.4</span>

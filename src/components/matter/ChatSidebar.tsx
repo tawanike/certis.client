@@ -3,14 +3,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Copy, Sparkles, ArrowLeft, FileText, FileSpreadsheet, FileImage, File, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import { ChatMessage, DocumentReference, chatMessages as defaultMessages, Workstream, WorkstreamType } from '@/data/mockData';
+import { ChatMessage, DocumentReference, Claim, Suggestion } from '@/types';
 import CommitGate from '@/components/CommitGate';
 import ContextualPrompts from '@/components/ContextualPrompts';
-import WorkstreamPills from './WorkstreamPills';
-import { Stage } from '@/components/ProgressTracker';
-import { Suggestion } from '@/types';
 import MentionPopover, { MentionItem, buildMentionItems } from './MentionPopover';
-import type { Claim } from '@/data/mockData';
 
 // Artifact keyword → tab mapping
 const ARTIFACT_PATTERNS: Array<{ pattern: RegExp; tab: string }> = [
@@ -340,39 +336,30 @@ interface ChatSidebarProps {
     onSendMessage?: (content: string) => void;
     onArtifactNavigate?: (tab: string) => void;
     onProposalAction?: (messageId: string, action: 'accept' | 'reject') => void;
-    currentStage?: Stage;
     matterTitle?: string;
     matterRef?: string;
+    matterStatus?: string;
     inputPrefill?: string;
     onClearPrefill?: () => void;
-    workstreams?: Workstream[];
-    activeWorkstreamId?: string;
-    onWorkstreamChange?: (id: string) => void;
-    onCreateWorkstream?: (type: WorkstreamType, label: string) => void;
     suggestions?: Suggestion[];
     suggestionsLoading?: boolean;
     onWorkflowAction?: (actionId: string) => void;
     onClaimNavigate?: (claimId: number) => void;
-    // Mention data sources
     claims?: Claim[];
     documents?: Array<{ id: string; filename: string; total_pages?: number; status?: string }>;
     briefVersion?: { id: string; version_number: number; is_authoritative: boolean } | null;
 }
 
 export default function ChatSidebar({
-    messages = defaultMessages,
+    messages = [],
     onSendMessage,
     onArtifactNavigate,
     onProposalAction,
-    currentStage = 'claims',
-    matterTitle = 'Autonomous Vehicle LiDAR Fusion',
-    matterRef = 'MAT-2024-032',
+    matterTitle,
+    matterRef,
+    matterStatus,
     inputPrefill,
     onClearPrefill,
-    workstreams,
-    activeWorkstreamId,
-    onWorkstreamChange,
-    onCreateWorkstream,
     suggestions = [],
     suggestionsLoading = false,
     onWorkflowAction,
@@ -522,11 +509,11 @@ export default function ChatSidebar({
                         color: 'var(--color-content-text)',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
-                        {matterTitle}
+                        {matterTitle || 'Loading...'}
                     </h2>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 22 }}>
-                    <span style={{ fontSize: 11, color: 'var(--color-content-text-muted)' }}>{matterRef}</span>
+                    {matterRef && <span style={{ fontSize: 11, color: 'var(--color-content-text-muted)' }}>{matterRef}</span>}
                     <span style={{
                         fontSize: 9, fontWeight: 700,
                         padding: '1px 6px',
@@ -536,7 +523,7 @@ export default function ChatSidebar({
                         textTransform: 'uppercase',
                         letterSpacing: '0.04em',
                     }}>
-                        {currentStage}
+                        {matterStatus ? matterStatus.replace(/_/g, ' ') : 'LOADING'}
                     </span>
                     <span style={{
                         fontSize: 11, color: 'var(--color-content-text-muted)',
@@ -547,16 +534,6 @@ export default function ChatSidebar({
                     </span>
                 </div>
             </div>
-
-            {/* Workstream Selector */}
-            {workstreams && workstreams.length > 0 && activeWorkstreamId && (
-                <WorkstreamPills
-                    workstreams={workstreams}
-                    activeId={activeWorkstreamId}
-                    onSelect={(id) => onWorkstreamChange?.(id)}
-                    onCreateNew={onCreateWorkstream}
-                />
-            )}
 
             {/* Messages */}
             <div style={{

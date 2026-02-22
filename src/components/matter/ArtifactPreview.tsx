@@ -17,8 +17,7 @@ import BriefUpload from '@/components/BriefUpload';
 import BriefViewer from '@/components/BriefViewer';
 import HoverableText from '@/components/HoverableText';
 import FileWrapperViewer from './FileWrapperViewer';
-import { type Claim, claimTree as defaultClaims } from '@/data/mockData';
-import { DocumentResponse, BriefVersion, ClaimGraphVersion, QAReportVersion, RiskAnalysisVersion, SpecVersion } from '@/types';
+import { type Claim, DocumentResponse, BriefVersion, ClaimGraphVersion, QAReportVersion, RiskAnalysisVersion, SpecVersion } from '@/types';
 
 type ArtifactTab = 'brief' | 'claims' | 'risk' | 'spec' | 'qa' | 'wrapper';
 
@@ -479,7 +478,7 @@ function BriefView({ matterId, briefVersion, onUploadSuccess, onApprove, isAppro
 
 // ---- Main Component ----
 export default function ArtifactPreview({
-    activeTab, onTabChange, claims = defaultClaims, onAddToChat, fileWrapperDocs = [],
+    activeTab, onTabChange, claims = [], onAddToChat, fileWrapperDocs = [],
     matterId, briefVersion, onBriefUploadSuccess, onApproveBrief, isApprovingBrief,
     claimVersion, onGenerateClaims, isGeneratingClaims, onCommitClaims, isCommittingClaims, briefApproved,
     highlightedClaimId,

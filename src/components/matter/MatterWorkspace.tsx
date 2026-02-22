@@ -4,15 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ChatSidebar from './ChatSidebar';
 import { mattersService } from '@/services/matters.service';
 import ArtifactPreview from './ArtifactPreview';
-import {
-    ChatMessage,
-    type Claim,
-    type Workstream,
-    type WorkstreamType,
-    mockWorkstreams,
-} from '@/data/mockData';
-import { Stage } from '@/components/ProgressTracker';
-import { Matter, BriefVersion, ClaimGraphVersion, Suggestion, QAReportVersion, RiskAnalysisVersion, SpecVersion } from '@/types';
+import { ChatMessage, Claim, Matter, BriefVersion, ClaimGraphVersion, Suggestion, QAReportVersion, RiskAnalysisVersion, SpecVersion } from '@/types';
 
 type ArtifactTab = 'brief' | 'claims' | 'risk' | 'spec' | 'qa' | 'wrapper';
 
@@ -59,14 +51,10 @@ interface MatterWorkspaceProps {
 }
 
 export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
-    const [workstreams, setWorkstreams] = useState<Workstream[]>(mockWorkstreams);
-    const [activeWorkstreamId, setActiveWorkstreamId] = useState(mockWorkstreams[0].id);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [claims, setClaims] = useState<Claim[]>([]);
     const [activeTab, setActiveTab] = useState<ArtifactTab>('brief');
     const [chatInputPrefill, setChatInputPrefill] = useState('');
-
-    const activeWorkstream = workstreams.find(ws => ws.id === activeWorkstreamId)!;
-    const currentStage = (activeWorkstream?.stage || 'brief') as Stage;
 
     const [documents, setDocuments] = useState<any[]>([]);
     const [matter, setMatter] = useState<Matter | null>(null);
@@ -444,13 +432,7 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
 
-        // Add message to active workstream
-        setWorkstreams(prev => prev.map(w => {
-            if (w.id === activeWorkstreamId) {
-                return { ...w, messages: [...w.messages, userMsg, aiMsg] };
-            }
-            return w;
-        }));
+        setMessages(prev => [...prev, userMsg, aiMsg]);
 
         try {
             const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
@@ -492,9 +474,7 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
                                     const payload = JSON.parse(dataStr);
                                     if (currentEvent === 'references') {
                                         refs = payload;
-                                        setWorkstreams(prev => prev.map(w => w.id === activeWorkstreamId ? {
-                                            ...w, messages: w.messages.map(m => m.id === aiMsgId ? { ...m, references: refs } : m)
-                                        } : w));
+                                        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, references: refs } : m));
                                     } else if (currentEvent === 'message') {
                                         streamedContent += payload.content;
                                         let parsedThinking = undefined;
@@ -504,23 +484,19 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
                                         if (thinkStartIdx !== -1) {
                                             const thinkEndIdx = streamedContent.indexOf('</think>');
                                             if (thinkEndIdx !== -1) {
-                                                // We have a full think block
                                                 parsedThinking = streamedContent.substring(thinkStartIdx + 7, thinkEndIdx).trimStart();
                                                 parsedContent = (streamedContent.substring(0, thinkStartIdx) + streamedContent.substring(thinkEndIdx + 8)).trimStart();
                                             } else {
-                                                // Still thinking...
                                                 parsedThinking = streamedContent.substring(thinkStartIdx + 7).trimStart();
                                                 parsedContent = streamedContent.substring(0, thinkStartIdx).trimStart();
                                             }
                                         }
 
-                                        setWorkstreams(prev => prev.map(w => w.id === activeWorkstreamId ? {
-                                            ...w, messages: w.messages.map(m => m.id === aiMsgId ? {
-                                                ...m,
-                                                content: parsedContent,
-                                                thinking: parsedThinking
-                                            } : m)
-                                        } : w));
+                                        setMessages(prev => prev.map(m => m.id === aiMsgId ? {
+                                            ...m,
+                                            content: parsedContent,
+                                            thinking: parsedThinking
+                                        } : m));
                                     } else if (currentEvent === 'done') {
                                         done = true;
                                     }
@@ -537,73 +513,20 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
             const errorMsg: ChatMessage = {
                 id: `msg-err-${Date.now()}`,
                 role: 'assistant',
-                content: "⚠️ Connection to Backend Failed. Is the server running?",
+                content: "Connection to Backend Failed. Is the server running?",
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             };
-            setWorkstreams(prev => prev.map(w => {
-                if (w.id === activeWorkstreamId) {
-                    return { ...w, messages: [...w.messages, errorMsg] };
-                }
-                return w;
-            }));
+            setMessages(prev => [...prev, errorMsg]);
         }
     };
 
     const handleProposalAction = (messageId: string, action: 'accept' | 'reject') => {
-        setWorkstreams(prev => prev.map(ws => {
-            if (ws.id !== activeWorkstreamId) return ws;
-            return {
-                ...ws,
-                messages: ws.messages.map(msg => {
-                    if (msg.id === messageId && msg.proposal) {
-                        return { ...msg, proposal: { ...msg.proposal, status: action === 'accept' ? 'accepted' : 'rejected' } };
-                    }
-                    return msg;
-                }),
-            };
-        }));
-
-        if (action === 'accept') {
-            const msg = activeWorkstream.messages.find(m => m.id === messageId);
-            if (msg?.proposal) {
-                const newClaim: Claim = {
-                    id: 12,
-                    type: 'independent',
-                    category: 'method',
-                    text: 'A method for adaptive sensor fusion in an autonomous vehicle...',
-                    riskFlags: [],
-                    children: [],
-                };
-                setClaims(prev => [...prev, newClaim]);
-                setActiveTab('claims');
+        setMessages(prev => prev.map(msg => {
+            if (msg.id === messageId && msg.proposal) {
+                return { ...msg, proposal: { ...msg.proposal, status: action === 'accept' ? 'accepted' : 'rejected' } };
             }
-        }
-    };
-
-    const handleWorkstreamChange = (id: string) => {
-        setActiveWorkstreamId(id);
-    };
-
-    const handleCreateWorkstream = (type: WorkstreamType, label: string) => {
-        const count = workstreams.filter(ws => ws.type === type).length;
-        const newWs: Workstream = {
-            id: `ws-${type}-${Date.now()}`,
-            matterId,
-            type,
-            label: count > 0 ? `${label} #${count + 1}` : label,
-            status: 'active',
-            stage: 'brief',
-            messages: [{
-                id: `sys-${Date.now()}`,
-                role: 'system',
-                content: `${label} workstream created`,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            }],
-            documents: [],
-            createdAt: new Date().toISOString(),
-        };
-        setWorkstreams(prev => [...prev, newWs]);
-        setActiveWorkstreamId(newWs.id);
+            return msg;
+        }));
     };
 
     return (
@@ -613,17 +536,15 @@ export default function MatterWorkspace({ matterId }: MatterWorkspaceProps) {
             overflow: 'hidden',
         }}>
             <ChatSidebar
-                messages={activeWorkstream.messages}
+                messages={messages}
                 onSendMessage={handleSendMessage}
                 onArtifactNavigate={(tab) => setActiveTab(tab as ArtifactTab)}
                 onProposalAction={handleProposalAction}
-                currentStage={currentStage}
+                matterTitle={matter?.title}
+                matterRef={matter?.reference_number}
+                matterStatus={matter?.status}
                 inputPrefill={chatInputPrefill}
                 onClearPrefill={() => setChatInputPrefill('')}
-                workstreams={workstreams}
-                activeWorkstreamId={activeWorkstreamId}
-                onWorkstreamChange={handleWorkstreamChange}
-                onCreateWorkstream={handleCreateWorkstream}
                 suggestions={suggestions}
                 suggestionsLoading={suggestionsLoading}
                 onWorkflowAction={handleWorkflowAction}

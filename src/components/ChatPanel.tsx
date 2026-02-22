@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Download, MoreHorizontal, Copy, Settings, Paperclip } from 'lucide-react';
-import { ChatMessage, chatMessages as defaultMessages } from '@/data/mockData';
+import { ChatMessage } from '@/types';
 import CommitGate from './CommitGate';
 import ContextualPrompts from './ContextualPrompts';
 import { Stage } from './ProgressTracker';
@@ -170,7 +170,7 @@ const STAGE_SUGGESTIONS: Record<Stage, Suggestion[]> = {
 };
 
 export default function ChatPanel({
-    messages = defaultMessages,
+    messages = [],
     onSendMessage,
     onArtifactNavigate,
     inputPrefill,

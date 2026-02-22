@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronRight, ChevronRightSquare, CheckCircle, ShieldCheck, Loader2, Sparkles } from 'lucide-react';
-import { type Claim, claimTree as defaultTree } from '@/data/mockData';
+import { type Claim } from '@/types';
 import HoverableText from './HoverableText';
 
 interface ClaimTreeProps {
@@ -202,7 +202,7 @@ function ClaimNode({ claim, depth, onAddToChat, isLastChild = false, highlighted
     );
 }
 
-export default function ClaimTree({ claims = defaultTree, onAddToChat, isSandbox = false, isAuthoritative, onCommit, isCommitting, onGenerate, isGenerating, briefApproved, highlightedClaimId }: ClaimTreeProps) {
+export default function ClaimTree({ claims = [], onAddToChat, isSandbox = false, isAuthoritative, onCommit, isCommitting, onGenerate, isGenerating, briefApproved, highlightedClaimId }: ClaimTreeProps) {
     const hasClaims = claims && claims.length > 0;
 
     // Empty state: no claims yet

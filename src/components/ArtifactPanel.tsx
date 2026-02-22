@@ -15,7 +15,7 @@ import ClaimTree from './ClaimTree';
 import RiskDashboard from './RiskDashboard';
 import HoverableText from './HoverableText';
 import BriefUpload from './BriefUpload';
-import { type Claim, claimTree as defaultClaims } from '@/data/mockData';
+import { type Claim } from '@/types';
 
 
 

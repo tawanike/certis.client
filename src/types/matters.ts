@@ -190,3 +190,79 @@ export interface AuditEvent {
     detail?: Record<string, any>;
     created_at: string;
 }
+
+// ---- Chat Types ----
+
+export interface DocumentReference {
+    filename: string;
+    page_number: number;
+    content: string;
+    document_id?: string;
+    chunk_index?: number;
+    content_type?: string;
+    total_pages?: number;
+}
+
+export interface ChatMessage {
+    id: string;
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    thinking?: string;
+    timestamp: string;
+    proposal?: {
+        title: string;
+        description: string;
+        status: 'pending' | 'accepted' | 'rejected';
+        diff?: string;
+    };
+    references?: DocumentReference[];
+}
+
+export interface Thread {
+    id: string;
+    title: string;
+    category: 'drafting' | 'risk' | 'prosecution';
+    lastActivity: string;
+    badge?: string;
+    type: 'authoritative' | 'exploratory' | 'analytical';
+}
+
+// ---- Claim Tree (frontend display format) ----
+
+export interface Claim {
+    id: number;
+    type: 'independent' | 'dependent';
+    category: 'system' | 'method' | 'apparatus';
+    text: string;
+    dependsOn?: number;
+    riskFlags?: { type: string; severity: 'low' | 'medium' | 'high' }[];
+    children?: Claim[];
+}
+
+// ---- Status Labels ----
+
+export const STATUS_LABELS: Record<string, { label: string; variant: string }> = {
+    CREATED: { label: 'Created', variant: 'info' },
+    BRIEF_ANALYZED: { label: 'Brief Analyzed', variant: 'info' },
+    CLAIMS_PROPOSED: { label: 'Claims Proposed', variant: 'warning' },
+    CLAIMS_APPROVED: { label: 'Claims Approved', variant: 'warning' },
+    RISK_REVIEWED: { label: 'Risk Reviewed', variant: 'accent' },
+    SPEC_GENERATED: { label: 'Spec Generated', variant: 'accent' },
+    RISK_RE_REVIEWED: { label: 'Risk Re-Reviewed', variant: 'accent' },
+    QA_COMPLETE: { label: 'QA Complete', variant: 'success' },
+    LOCKED_FOR_EXPORT: { label: 'Export Ready', variant: 'success' },
+};
+
+// ---- Threads (sidebar navigation) ----
+
+export const threads: Thread[] = [
+    { id: 'thread-1', title: 'Main Draft', category: 'drafting', lastActivity: '2 min ago', badge: 'Claims Updated', type: 'authoritative' },
+    { id: 'thread-2', title: 'Claim Strategy', category: 'drafting', lastActivity: '15 min ago', type: 'exploratory' },
+    { id: 'thread-3', title: 'Embodiment Expansion', category: 'drafting', lastActivity: '1 hr ago', badge: 'Spec Expanded', type: 'authoritative' },
+    { id: 'thread-4', title: 'Variant Exploration', category: 'drafting', lastActivity: '3 hrs ago', type: 'exploratory' },
+    { id: 'thread-5', title: 'Litigation Analysis', category: 'risk', lastActivity: '30 min ago', badge: 'Risk Flag Added', type: 'analytical' },
+    { id: 'thread-6', title: '112 Review', category: 'risk', lastActivity: '2 hrs ago', badge: '2 Warnings', type: 'analytical' },
+    { id: 'thread-7', title: 'QA Reports', category: 'risk', lastActivity: '1 hr ago', type: 'analytical' },
+    { id: 'thread-8', title: 'Office Action', category: 'prosecution', lastActivity: '1 day ago', type: 'authoritative' },
+    { id: 'thread-9', title: 'Amendment Plan', category: 'prosecution', lastActivity: '2 days ago', type: 'exploratory' },
+];
