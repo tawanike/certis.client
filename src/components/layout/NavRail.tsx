@@ -157,7 +157,7 @@ export default function NavRail() {
 
             {/* User Avatar */}
             <div style={{ marginTop: 8 }}>
-                <UserProfileDropdown hideLabel={!!activeMatterId} />
+                <UserProfileDropdown />
             </div>
         </div>
     );

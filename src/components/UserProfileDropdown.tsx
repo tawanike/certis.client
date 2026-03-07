@@ -24,7 +24,7 @@ import {
     AvatarImage,
 } from "@/components/ui/avatar";
 
-export default function UserProfileDropdown({ hideLabel = false }: { hideLabel?: boolean }) {
+export default function UserProfileDropdown() {
     const { user, logout } = useAuthStore();
     const { setTheme } = useTheme();
 
@@ -44,12 +44,7 @@ export default function UserProfileDropdown({ hideLabel = false }: { hideLabel?:
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <div className="flex items-center gap-2 cursor-pointer outline-none md:ml-4">
-                    {!hideLabel && (
-                        <span className="hidden md:inline-block text-sm font-medium text-muted-foreground mr-2">
-                            {user?.full_name || user?.email}
-                        </span>
-                    )}
+                <div className="flex items-center cursor-pointer outline-none">
                     <Avatar className="h-9 w-9 border border-border transition-all hover:ring-2 hover:ring-ring hover:ring-offset-2">
                         <AvatarImage src={`https://avatar.vercel.sh/${user?.email}.svg?text=${getInitials()}`} alt={user?.full_name || "User"} />
                         <AvatarFallback>{getInitials()}</AvatarFallback>

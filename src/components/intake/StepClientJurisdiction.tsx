@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { Globe, Search, Building2, Check } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Globe, Search, Building2, Check, Plus, X } from 'lucide-react';
+import { clientsService, type ClientResponse } from '@/services/clients.service';
 import type { MatterFormData } from '@/app/matter/new/page';
 
 interface StepProps {
@@ -9,38 +10,69 @@ interface StepProps {
     updateFormData: (updates: Partial<MatterFormData>) => void;
 }
 
-// Mock client data
-const MOCK_CLIENTS = [
-    { id: 'client-001', name: 'NovaDrive Technologies Inc.', contact: 'Dr. Sarah Chen' },
-    { id: 'client-002', name: 'CipherLattice GmbH', contact: 'Prof. Marcus Weber' },
-    { id: 'client-003', name: 'BioSync Medical Corp.', contact: 'Dr. Aisha Patel' },
-    { id: 'client-004', name: 'ChainCore Labs', contact: 'James Liu' },
-    { id: 'client-005', name: 'Meridian Aerospace Ltd.', contact: 'Dr. Takeshi Yamamoto' },
-    { id: 'client-006', name: 'QuantumEdge Computing', contact: 'Elena Kowalski' },
+const JURISDICTIONS = [
+    { id: 'USPTO', name: 'United States', flag: '\u{1F1FA}\u{1F1F8}', org: 'USPTO' },
+    { id: 'EPO', name: 'European Union', flag: '\u{1F1EA}\u{1F1FA}', org: 'EPO' },
+    { id: 'WIPO', name: 'International', flag: '\u{1F30D}', org: 'WIPO' },
+    { id: 'JPO', name: 'Japan', flag: '\u{1F1EF}\u{1F1F5}', org: 'JPO' },
+    { id: 'KIPO', name: 'South Korea', flag: '\u{1F1F0}\u{1F1F7}', org: 'KIPO' },
+    { id: 'CNIPA', name: 'China', flag: '\u{1F1E8}\u{1F1F3}', org: 'CNIPA' },
 ];
 
-const JURISDICTIONS = [
-    { id: 'USPTO', name: 'United States', flag: '🇺🇸', org: 'USPTO' },
-    { id: 'EPO', name: 'European Union', flag: '🇪🇺', org: 'EPO' },
-    { id: 'WIPO', name: 'International', flag: '🌍', org: 'WIPO' },
-    { id: 'JPO', name: 'Japan', flag: '🇯🇵', org: 'JPO' },
-    { id: 'KIPO', name: 'South Korea', flag: '🇰🇷', org: 'KIPO' },
-    { id: 'CNIPA', name: 'China', flag: '🇨🇳', org: 'CNIPA' },
-];
+const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 12px',
+    borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--color-content-border-strong)',
+    background: 'var(--color-content-surface)',
+    fontSize: 13,
+    fontFamily: 'var(--font-sans)',
+    color: 'var(--color-content-text)',
+    outline: 'none',
+};
 
 export default function StepClientJurisdiction({ formData, updateFormData }: StepProps) {
+    const [clients, setClients] = useState<ClientResponse[]>([]);
     const [clientSearch, setClientSearch] = useState('');
     const [showClientDropdown, setShowClientDropdown] = useState(false);
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [newClient, setNewClient] = useState({ name: '', company: '', email: '', phone: '' });
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        clientsService.list().then(setClients).catch(() => {});
+    }, []);
 
     const filteredClients = useMemo(() =>
-        MOCK_CLIENTS.filter(c =>
+        clients.filter(c =>
             c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-            c.contact.toLowerCase().includes(clientSearch.toLowerCase())
+            (c.company || '').toLowerCase().includes(clientSearch.toLowerCase())
         ),
-        [clientSearch]
+        [clientSearch, clients]
     );
 
-    const selectedClient = MOCK_CLIENTS.find(c => c.id === formData.clientId);
+    const selectedClient = clients.find(c => c.id === formData.clientId);
+
+    const handleAddClient = async () => {
+        if (!newClient.name.trim()) return;
+        setSaving(true);
+        try {
+            const created = await clientsService.create({
+                name: newClient.name.trim(),
+                company: newClient.company.trim() || undefined,
+                email: newClient.email.trim() || undefined,
+                phone: newClient.phone.trim() || undefined,
+            });
+            setClients(prev => [...prev, created]);
+            updateFormData({ clientId: created.id });
+            setNewClient({ name: '', company: '', email: '', phone: '' });
+            setShowAddForm(false);
+        } catch {
+            // Error creating client
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const toggleJurisdiction = (id: string) => {
         const current = formData.jurisdictions;
@@ -84,98 +116,220 @@ export default function StepClientJurisdiction({ formData, updateFormData }: Ste
                     }}>
                         Client
                     </label>
-                    <div style={{ position: 'relative' }}>
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: 8,
-                            padding: '10px 14px',
-                            borderRadius: 'var(--radius-md)',
-                            border: `1px solid ${showClientDropdown ? 'var(--color-accent-400)' : 'var(--color-content-border-strong)'}`,
-                            background: 'var(--color-content-surface)',
-                            transition: 'border-color 0.15s ease',
-                        }}>
-                            <Search size={14} style={{ color: 'var(--color-content-text-muted)', flexShrink: 0 }} />
-                            <input
-                                type="text"
-                                value={selectedClient && !showClientDropdown ? selectedClient.name : clientSearch}
-                                onChange={(e) => {
-                                    setClientSearch(e.target.value);
-                                    setShowClientDropdown(true);
-                                }}
-                                onFocus={() => {
-                                    setShowClientDropdown(true);
-                                    if (selectedClient) setClientSearch('');
-                                }}
-                                onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
-                                placeholder="Search clients..."
-                                style={{
-                                    flex: 1, border: 'none', outline: 'none',
-                                    background: 'none', fontSize: 14, fontFamily: 'var(--font-sans)',
-                                    color: 'var(--color-content-text)',
-                                }}
-                            />
-                            {selectedClient && (
-                                <div style={{
-                                    fontSize: 11, fontWeight: 500, color: 'var(--color-accent-600)',
-                                    background: 'var(--color-accent-50)',
-                                    padding: '2px 8px', borderRadius: 'var(--radius-full)',
-                                    flexShrink: 0,
-                                }}>
-                                    Selected
-                                </div>
-                            )}
-                        </div>
 
-                        {/* Dropdown */}
-                        {showClientDropdown && (
+                    {showAddForm ? (
+                        <div style={{
+                            padding: 16,
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid var(--color-accent-400)',
+                            background: 'var(--color-content-surface)',
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-content-text)' }}>
+                                    New Client
+                                </span>
+                                <button
+                                    onClick={() => setShowAddForm(false)}
+                                    style={{
+                                        background: 'none', border: 'none', cursor: 'pointer',
+                                        color: 'var(--color-content-text-muted)', padding: 2,
+                                        display: 'flex', alignItems: 'center',
+                                    }}
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-content-text-secondary)', marginBottom: 4 }}>
+                                        Name <span style={{ color: 'var(--color-danger)' }}>*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={newClient.name}
+                                        onChange={e => setNewClient(prev => ({ ...prev, name: e.target.value }))}
+                                        placeholder="Client or company name"
+                                        style={inputStyle}
+                                        autoFocus
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-content-text-secondary)', marginBottom: 4 }}>
+                                        Company
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={newClient.company}
+                                        onChange={e => setNewClient(prev => ({ ...prev, company: e.target.value }))}
+                                        placeholder="Legal entity name"
+                                        style={inputStyle}
+                                    />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-content-text-secondary)', marginBottom: 4 }}>
+                                            Email
+                                        </label>
+                                        <input
+                                            type="email"
+                                            value={newClient.email}
+                                            onChange={e => setNewClient(prev => ({ ...prev, email: e.target.value }))}
+                                            placeholder="contact@example.com"
+                                            style={inputStyle}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-content-text-secondary)', marginBottom: 4 }}>
+                                            Phone
+                                        </label>
+                                        <input
+                                            type="tel"
+                                            value={newClient.phone}
+                                            onChange={e => setNewClient(prev => ({ ...prev, phone: e.target.value }))}
+                                            placeholder="+1 (555) 000-0000"
+                                            style={inputStyle}
+                                        />
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleAddClient}
+                                    disabled={!newClient.name.trim() || saving}
+                                    style={{
+                                        marginTop: 4,
+                                        padding: '9px 20px',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: 'none',
+                                        background: newClient.name.trim() && !saving
+                                            ? 'var(--color-accent-500)'
+                                            : 'var(--color-content-raised)',
+                                        color: newClient.name.trim() && !saving
+                                            ? 'white'
+                                            : 'var(--color-content-text-muted)',
+                                        fontSize: 13, fontWeight: 600,
+                                        cursor: newClient.name.trim() && !saving ? 'pointer' : 'default',
+                                        transition: 'all 0.15s ease',
+                                        alignSelf: 'flex-end',
+                                    }}
+                                >
+                                    {saving ? 'Saving...' : 'Add Client'}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ position: 'relative' }}>
                             <div style={{
-                                position: 'absolute', top: '100%', left: 0, right: 0,
-                                marginTop: 4, zIndex: 50,
-                                background: 'var(--color-content-surface)',
-                                border: '1px solid var(--color-content-border)',
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                padding: '10px 14px',
                                 borderRadius: 'var(--radius-md)',
-                                boxShadow: 'var(--shadow-elevated)',
-                                maxHeight: 220, overflowY: 'auto',
+                                border: `1px solid ${showClientDropdown ? 'var(--color-accent-400)' : 'var(--color-content-border-strong)'}`,
+                                background: 'var(--color-content-surface)',
+                                transition: 'border-color 0.15s ease',
                             }}>
-                                {filteredClients.map(client => (
+                                <Search size={14} style={{ color: 'var(--color-content-text-muted)', flexShrink: 0 }} />
+                                <input
+                                    type="text"
+                                    value={selectedClient && !showClientDropdown ? selectedClient.name : clientSearch}
+                                    onChange={(e) => {
+                                        setClientSearch(e.target.value);
+                                        setShowClientDropdown(true);
+                                    }}
+                                    onFocus={() => {
+                                        setShowClientDropdown(true);
+                                        if (selectedClient) setClientSearch('');
+                                    }}
+                                    onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
+                                    placeholder="Search clients..."
+                                    style={{
+                                        flex: 1, border: 'none', outline: 'none',
+                                        background: 'none', fontSize: 14, fontFamily: 'var(--font-sans)',
+                                        color: 'var(--color-content-text)',
+                                    }}
+                                />
+                                {selectedClient && (
+                                    <div style={{
+                                        fontSize: 11, fontWeight: 500, color: 'var(--color-accent-600)',
+                                        background: 'var(--color-accent-50)',
+                                        padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                                        flexShrink: 0,
+                                    }}>
+                                        Selected
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Dropdown */}
+                            {showClientDropdown && (
+                                <div style={{
+                                    position: 'absolute', top: '100%', left: 0, right: 0,
+                                    marginTop: 4, zIndex: 50,
+                                    background: 'var(--color-content-surface)',
+                                    border: '1px solid var(--color-content-border)',
+                                    borderRadius: 'var(--radius-md)',
+                                    boxShadow: 'var(--shadow-elevated)',
+                                    maxHeight: 260, overflowY: 'auto',
+                                }}>
+                                    {filteredClients.map(client => (
+                                        <div
+                                            key={client.id}
+                                            onMouseDown={() => {
+                                                updateFormData({ clientId: client.id });
+                                                setClientSearch('');
+                                                setShowClientDropdown(false);
+                                            }}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 10,
+                                                padding: '10px 14px',
+                                                cursor: 'pointer',
+                                                transition: 'background 0.1s ease',
+                                                background: formData.clientId === client.id ? 'var(--color-accent-50)' : 'transparent',
+                                            }}
+                                            onMouseOver={(e) => e.currentTarget.style.background = 'var(--color-content-raised)'}
+                                            onMouseOut={(e) => e.currentTarget.style.background = formData.clientId === client.id ? 'var(--color-accent-50)' : 'transparent'}
+                                        >
+                                            <Building2 size={16} style={{ color: 'var(--color-content-text-muted)' }} />
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-content-text)' }}>
+                                                    {client.name}
+                                                </div>
+                                                <div style={{ fontSize: 12, color: 'var(--color-content-text-muted)' }}>
+                                                    {client.company || client.email}
+                                                </div>
+                                            </div>
+                                            {formData.clientId === client.id && (
+                                                <Check size={16} style={{ color: 'var(--color-accent-500)' }} />
+                                            )}
+                                        </div>
+                                    ))}
+                                    {/* Add New Client option */}
                                     <div
-                                        key={client.id}
                                         onMouseDown={() => {
-                                            updateFormData({ clientId: client.id });
-                                            setClientSearch('');
                                             setShowClientDropdown(false);
+                                            setNewClient(prev => ({
+                                                ...prev,
+                                                name: clientSearch,
+                                            }));
+                                            setClientSearch('');
+                                            setShowAddForm(true);
                                         }}
                                         style={{
                                             display: 'flex', alignItems: 'center', gap: 10,
                                             padding: '10px 14px',
                                             cursor: 'pointer',
+                                            borderTop: '1px solid var(--color-content-border)',
                                             transition: 'background 0.1s ease',
-                                            background: formData.clientId === client.id ? 'var(--color-accent-50)' : 'transparent',
                                         }}
                                         onMouseOver={(e) => e.currentTarget.style.background = 'var(--color-content-raised)'}
-                                        onMouseOut={(e) => e.currentTarget.style.background = formData.clientId === client.id ? 'var(--color-accent-50)' : 'transparent'}
+                                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
                                     >
-                                        <Building2 size={16} style={{ color: 'var(--color-content-text-muted)' }} />
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-content-text)' }}>
-                                                {client.name}
-                                            </div>
-                                            <div style={{ fontSize: 12, color: 'var(--color-content-text-muted)' }}>
-                                                {client.contact}
-                                            </div>
-                                        </div>
-                                        {formData.clientId === client.id && (
-                                            <Check size={16} style={{ color: 'var(--color-accent-500)' }} />
-                                        )}
+                                        <Plus size={16} style={{ color: 'var(--color-accent-500)' }} />
+                                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-accent-600)' }}>
+                                            Add new client{clientSearch ? ` "${clientSearch}"` : ''}
+                                        </span>
                                     </div>
-                                ))}
-                                {filteredClients.length === 0 && (
-                                    <div style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: 'var(--color-content-text-muted)' }}>
-                                        No clients found
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Jurisdictions */}

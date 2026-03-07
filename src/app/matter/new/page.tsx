@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import StepMatterDetails from '@/components/intake/StepMatterDetails';
 import StepClientJurisdiction from '@/components/intake/StepClientJurisdiction';
+import StepDraftingObjective from '@/components/intake/StepDraftingObjective';
 import StepDocuments from '@/components/intake/StepDocuments';
 import StepProcessing from '@/components/intake/StepProcessing';
 import { mattersService } from '@/services/matters.service';
@@ -16,6 +17,7 @@ export interface MatterFormData {
     description: string;
     clientId: string;
     jurisdictions: string[];
+    draftingObjective: string;
     inventionDisclosure: File | null;
     supportingDocuments: File[];
 }
@@ -23,8 +25,9 @@ export interface MatterFormData {
 const STEPS = [
     { id: 1, label: 'Matter Details' },
     { id: 2, label: 'Client & Jurisdiction' },
-    { id: 3, label: 'Documents' },
-    { id: 4, label: 'Processing' },
+    { id: 3, label: 'Drafting Objective' },
+    { id: 4, label: 'Documents' },
+    { id: 5, label: 'Processing' },
 ];
 
 export default function NewMatterPage() {
@@ -35,6 +38,7 @@ export default function NewMatterPage() {
         description: '',
         clientId: '',
         jurisdictions: [],
+        draftingObjective: '',
         inventionDisclosure: null,
         supportingDocuments: [],
     });
@@ -48,18 +52,19 @@ export default function NewMatterPage() {
         switch (currentStep) {
             case 1: return formData.title.trim().length > 0;
             case 2: return formData.jurisdictions.length > 0;
-            case 3: return true; // Documents are optional for now
+            case 3: return formData.draftingObjective.length > 0;
+            case 4: return true; // Documents are optional for now
             default: return false;
         }
     };
 
     const handleNext = async () => {
-        if (currentStep < 4) {
+        if (currentStep < 5) {
             setCurrentStep(currentStep + 1);
         }
-        if (currentStep === 3) {
+        if (currentStep === 4) {
             // Move to processing step and start submission
-            setCurrentStep(4);
+            setCurrentStep(5);
         }
     };
 
@@ -137,14 +142,14 @@ export default function NewMatterPage() {
             </header>
 
             {/* Step Indicator */}
-            {currentStep < 4 && (
+            {currentStep < 5 && (
                 <div style={{
                     display: 'flex',
                     justifyContent: 'center',
                     padding: '24px 32px 0',
                     gap: 8,
                 }}>
-                    {STEPS.slice(0, 3).map((step) => (
+                    {STEPS.slice(0, 4).map((step) => (
                         <div key={step.id} style={{
                             display: 'flex', alignItems: 'center', gap: 8,
                         }}>
@@ -171,7 +176,7 @@ export default function NewMatterPage() {
                             }}>
                                 {step.label}
                             </span>
-                            {step.id < 3 && (
+                            {step.id < 4 && (
                                 <div style={{
                                     width: 40, height: 1,
                                     background: currentStep > step.id
@@ -214,12 +219,18 @@ export default function NewMatterPage() {
                                 />
                             )}
                             {currentStep === 3 && (
-                                <StepDocuments
+                                <StepDraftingObjective
                                     formData={formData}
                                     updateFormData={updateFormData}
                                 />
                             )}
                             {currentStep === 4 && (
+                                <StepDocuments
+                                    formData={formData}
+                                    updateFormData={updateFormData}
+                                />
+                            )}
+                            {currentStep === 5 && (
                                 <StepProcessing
                                     onSubmit={handleSubmit}
                                     onComplete={handleComplete}
@@ -231,7 +242,7 @@ export default function NewMatterPage() {
             </div>
 
             {/* Bottom Navigation */}
-            {currentStep < 4 && (
+            {currentStep < 5 && (
                 <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -271,7 +282,7 @@ export default function NewMatterPage() {
                             transition: 'all 0.2s ease',
                         }}
                     >
-                        {currentStep === 3 ? 'Create Matter' : 'Continue'}
+                        {currentStep === 4 ? 'Create Matter' : 'Continue'}
                     </button>
                 </div>
             )}
